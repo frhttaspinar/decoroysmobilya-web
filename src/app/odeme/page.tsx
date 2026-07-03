@@ -4,14 +4,14 @@ import { useCartStore } from "@/store/useCartStore";
 import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { ShieldCheck, CreditCard, CheckCircle, Loader2, Lock, X } from "lucide-react";
+import { ShieldCheck, CreditCard, Loader2, Lock, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Step = "form" | "payment";
 
 export default function CheckoutPage() {
-  const { items, clearCart } = useCartStore();
+  const { items } = useCartStore();
   const [isMounted, setIsMounted]       = useState(false);
   const [currentUser, setCurrentUser]   = useState<User | null>(null);
 
@@ -24,12 +24,10 @@ export default function CheckoutPage() {
   const [district, setDistrict]   = useState("");
 
   // Akış state
-  const [step, setStep]           = useState<Step>("form");
+  const [step, setStep]             = useState<Step>("form");
   const [paytrToken, setPaytrToken] = useState<string | null>(null);
-  const [orderId, setOrderId]     = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -79,17 +77,16 @@ export default function CheckoutPage() {
           size:     item.size     ?? null,
         })),
         total,
-        status:    "ödeme_bekleniyor",
+        status:    "Beklemede",
         uid:       currentUser ? currentUser.uid : null,
         isGuest:   !currentUser,
         createdAt: serverTimestamp(),
       };
 
-      const docRef    = await addDoc(collection(db, "orders"), orderData);
-      const newOrdId  = docRef.id;
-      setOrderId(newOrdId);
+      const docRef   = await addDoc(collection(db, "orders"), orderData);
+      const newOrdId = docRef.id;
 
-      // 2. PayTR token al
+      // 2. PayTR token al — hata varsa iFrame ASLA açılmaz
       const res = await fetch("/api/payment/paytr", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,7 +105,7 @@ export default function CheckoutPage() {
 
       const data = await res.json() as { token?: string; error?: string };
       if (!res.ok || !data.token) {
-        throw new Error(data.error ?? "Ödeme başlatılamadı. Lütfen tekrar deneyin.");
+        throw new Error("Ödeme sistemi başlatılamadı, lütfen daha sonra tekrar deneyin.");
       }
 
       setPaytrToken(data.token);
@@ -120,36 +117,6 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
     }
   };
-
-  // Başarı ekranı (webhook zaten siparişi günceller; bu ekran kullanıcıya gösterilir)
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
-        <div className="max-w-md w-full text-center space-y-6">
-          <CheckCircle className="w-20 h-20 text-green-500 mx-auto" />
-          <h1 className="text-3xl font-light text-zinc-900">Siparişiniz Alındı!</h1>
-          <p className="text-zinc-500 font-light leading-relaxed">
-            Teşekkürler, <strong className="font-medium text-zinc-800">{fullName}</strong>.
-            Siparişiniz başarıyla kaydedildi.
-          </p>
-          {orderId && (
-            <div className="bg-zinc-50 rounded-xl px-6 py-4 text-sm text-zinc-500 font-mono break-all">
-              Sipariş No:{" "}
-              <span className="text-zinc-900 font-semibold">
-                {orderId.slice(0, 12).toUpperCase()}
-              </span>
-            </div>
-          )}
-          <Link
-            href="/"
-            className="inline-block w-full bg-zinc-900 text-white py-4 rounded-xl font-medium hover:bg-black transition-colors"
-          >
-            Ana Sayfaya Dön
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
