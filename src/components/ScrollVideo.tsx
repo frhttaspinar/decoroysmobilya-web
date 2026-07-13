@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   motion,
   useScroll,
@@ -23,6 +23,16 @@ export default function ScrollVideo() {
     stiffness: 50,
     damping: 20,
   });
+
+  // iOS Safari, bir play() denemesi olmadan ilk kareyi decode edip boyamaz (gri ekran);
+  // React ayrıca muted prop'unu DOM attribute'una yansıtmayabildiği için burada zorluyoruz
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = true;
+    const p = v.play();
+    if (p) p.then(() => v.pause()).catch(() => {});
+  }, []);
 
   useMotionValueEvent(smoothProgress, "change", (latest) => {
     if (videoRef.current && videoRef.current.readyState >= 2) {
@@ -62,8 +72,10 @@ export default function ScrollVideo() {
           src="/animasyon.mp4"
           muted
           playsInline
-          preload="auto"
-          className="absolute inset-0 w-full h-full object-cover"
+          autoPlay
+          preload="metadata"
+          onLoadedData={(e) => e.currentTarget.pause()}
+          className="absolute inset-0 w-full h-full object-cover transform-gpu"
         />
 
         {/* Karartma katmanı */}
