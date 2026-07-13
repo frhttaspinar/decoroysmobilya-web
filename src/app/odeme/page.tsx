@@ -149,7 +149,7 @@ export default function CheckoutPage() {
 
           {/* PayTR iFrame */}
           <iframe
-            src={`https://www.paytr.com/odeme/api/${paytrToken}`}
+            src={`https://www.paytr.com/odeme/guvenli/${paytrToken}`}
             className="flex-1 w-full border-0"
             allow="payment"
             title="PayTR Güvenli Ödeme"
