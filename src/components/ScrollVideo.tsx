@@ -42,12 +42,19 @@ export default function ScrollVideo() {
   const t3Y       = useTransform(scrollYProgress, [0.64, 0.74, 0.88, 0.96], [52, 0, 0, -52]);
 
   // Scroll göstergesi — ilk %5'te kayboluyor
-  const indicatorOpacity = useTransform(scrollYProgress, [0, 0.05], [1, 0]);
+  // smoothProgress (spring) kullanılıyor: tek başına opacity'ye bağlanan ham scroll
+  // değerini framer native ScrollTimeline'a devrediyor ve yanlış aralık ölçüyor
+  const indicatorOpacity = useTransform(smoothProgress, [0, 0.05], [1, 0]);
 
   return (
-    <div ref={wrapperRef} className="relative h-[300vh] md:h-[500vh] lg:h-[600vh]">
-      {/* ── Sticky sahne ── */}
-      <div className="sticky top-0 h-screen w-full overflow-hidden">
+    // overflow-x-clip: yatay taşmayı keser; overflow-x-hidden kullanılmaz çünkü
+    // sticky ebeveyninde overflow-hidden position:sticky'yi bozar
+    <div
+      ref={wrapperRef}
+      className="relative w-full max-w-full overflow-x-clip h-[150dvh] md:h-[300vh] lg:h-[400vh]"
+    >
+      {/* ── Sticky sahne — dvh: adres çubuğu/alt bar hareketlerini tolere eder ── */}
+      <div className="sticky top-0 h-screen supports-[height:100dvh]:h-dvh w-full overflow-hidden">
 
         {/* Video */}
         <video
@@ -71,10 +78,10 @@ export default function ScrollVideo() {
           style={{ opacity: t1Opacity, y: t1Y }}
           className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none"
         >
-          <span className="text-[10px] md:text-xs font-bold tracking-[0.35em] uppercase text-white/50 mb-5">
+          <span className="text-[10px] md:text-xs font-bold tracking-[0.35em] uppercase text-white/50 mb-4 md:mb-5">
             Premium Mobilya
           </span>
-          <h2 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black text-white leading-[1.06] tracking-tight">
+          <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-[5.5rem] font-black text-white leading-[1.06] tracking-tight max-w-full">
             Decoroys
             <br />
             <span
@@ -93,9 +100,9 @@ export default function ScrollVideo() {
         {/* ═══ Text 3: modernlik ═══ */}
         <motion.div
           style={{ opacity: t3Opacity, y: t3Y }}
-          className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 md:px-20 pointer-events-none"
+          className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 md:px-20 pointer-events-none"
         >
-          <p className="text-2xl md:text-4xl lg:text-5xl font-light text-white leading-tight max-w-3xl">
+          <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-light text-white leading-tight max-w-3xl">
             Evinize{" "}
             <span
               className="font-semibold"
@@ -116,7 +123,7 @@ export default function ScrollVideo() {
         {/* ── Scroll göstergesi ── */}
         <motion.div
           style={{ opacity: indicatorOpacity }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
+          className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
         >
           <span className="text-white/45 text-[9px] tracking-[0.35em] uppercase">Kaydır</span>
           <motion.div

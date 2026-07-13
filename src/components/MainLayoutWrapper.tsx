@@ -24,8 +24,8 @@ export default function MainLayoutWrapper({ children }: { children: React.ReactN
   return (
     <>
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-200/50">
-        <nav className="max-w-7xl mx-auto px-6 h-20 md:h-24 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 flex-shrink-0">
+        <nav className="max-w-7xl mx-auto px-4 md:px-6 h-20 md:h-24 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 md:gap-3 flex-shrink-0">
             {/* Marka yazısı */}
             <motion.div
               initial={{ opacity: 0, x: -16 }}
@@ -64,7 +64,7 @@ export default function MainLayoutWrapper({ children }: { children: React.ReactN
               whileTap={{ scale: 0.95 }}
               className="origin-left"
             >
-              <img src="/images/logo.png" alt="Decoroys" className="h-14 md:h-16 w-auto object-contain" />
+              <img src="/images/logo.png" alt="Decoroys" className="h-12 md:h-16 w-auto object-contain" />
             </motion.div>
           </Link>
 

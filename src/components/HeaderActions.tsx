@@ -12,7 +12,7 @@ export default function HeaderActions() {
   const { openDrawer } = useDrawerStore();
 
   return (
-    <div className="flex items-center gap-8">
+    <div className="flex items-center gap-4 md:gap-8">
       <motion.div
         initial={{ opacity: 0, x: 22 }}
         animate={{ opacity: 1, x: 0 }}
