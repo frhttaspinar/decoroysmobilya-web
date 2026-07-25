@@ -25,37 +25,7 @@ export default function MainLayoutWrapper({ children }: { children: React.ReactN
     <>
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-200/50">
         <nav className="max-w-7xl mx-auto px-4 md:px-6 h-20 md:h-24 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-            {/* Marka yazısı */}
-            <motion.div
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 0.6, 0.22, 1] }}
-              className="flex flex-col leading-none"
-            >
-              <motion.span
-                className="text-base md:text-lg font-black tracking-tight"
-                style={{
-                  background: "linear-gradient(90deg, #f97316, #ec4899, #8b5cf6)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-              >
-                Decoroys
-              </motion.span>
-              <motion.span
-                className="text-[10px] md:text-xs font-semibold tracking-[0.2em] uppercase text-zinc-400"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.35 }}
-              >
-                Mobilya
-              </motion.span>
-            </motion.div>
-
+          <Link href="/" className="flex items-center flex-shrink-0">
             <motion.div
               initial={{ opacity: 0, x: -28, scale: 0.85 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
