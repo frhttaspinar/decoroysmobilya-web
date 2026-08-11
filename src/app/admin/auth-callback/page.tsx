@@ -63,8 +63,8 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl shadow-zinc-200/60 border border-zinc-100 p-10 flex flex-col items-center text-center gap-6">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4 sm:p-6">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl shadow-zinc-200/60 border border-zinc-100 p-6 sm:p-10 flex flex-col items-center text-center gap-6">
         {status === "loading" && (
           <>
             <Loader2 className="w-12 h-12 text-zinc-400 animate-spin" />

@@ -124,9 +124,9 @@ export default function AdminSiparislerPage() {
     <>
       {/* ═══ Hata Toast ═══ */}
       {actionError && (
-        <div className="fixed top-6 right-6 z-[200] flex items-center gap-3 bg-white border border-red-200 shadow-xl rounded-2xl px-6 py-4 transition-all duration-300">
+        <div className="fixed top-4 left-4 right-4 sm:top-6 sm:left-auto sm:right-6 sm:max-w-sm z-[200] flex items-center gap-3 bg-white border border-red-200 shadow-xl rounded-2xl px-5 py-4 sm:px-6 transition-all duration-300">
           <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-red-700">{actionError}</span>
+          <span className="text-sm font-medium text-red-700 min-w-0">{actionError}</span>
         </div>
       )}
 
@@ -134,9 +134,9 @@ export default function AdminSiparislerPage() {
       {deleteConfirmId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)} />
-          <div className="relative bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center space-y-4">
+          <div className="relative bg-white rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-sm max-h-[90vh] overflow-y-auto text-center space-y-4">
             <Trash2 className="w-10 h-10 text-red-400 mx-auto" />
-            <h3 className="text-lg font-bold text-zinc-900">Siparişi Silmek İstediğinize Emin Misiniz?</h3>
+            <h3 className="text-base sm:text-lg font-bold text-zinc-900">Siparişi Silmek İstediğinize Emin Misiniz?</h3>
             <p className="text-sm text-zinc-500 font-light">Bu işlem geri alınamaz.</p>
             <div className="flex gap-3 pt-2">
               <button
@@ -157,10 +157,10 @@ export default function AdminSiparislerPage() {
       )}
 
       {/* ═══ Normal Ekran ═══ */}
-      <div className="p-8 md:p-12 w-full print:hidden">
+      <div className="w-full print:hidden">
         {/* Başlık */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Siparişler</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Siparişler</h1>
           <p className="text-zinc-500 mt-2 font-light">
             Toplam {orders.length} sipariş bulunuyor.
           </p>
@@ -205,19 +205,19 @@ export default function AdminSiparislerPage() {
           {loading ? (
             // Skeleton Loader
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white border border-zinc-100 rounded-3xl shadow-sm p-6 flex items-center gap-6 animate-pulse">
-                <div className="flex-1 space-y-3">
-                  <div className="h-5 bg-zinc-200 rounded w-1/4"></div>
-                  <div className="h-4 bg-zinc-100 rounded w-1/3"></div>
+              <div key={i} className="bg-white border border-zinc-100 rounded-3xl shadow-sm p-5 sm:p-6 flex items-center gap-4 sm:gap-6 animate-pulse">
+                <div className="flex-1 min-w-0 space-y-3">
+                  <div className="h-5 bg-zinc-200 rounded w-1/2 sm:w-1/4"></div>
+                  <div className="h-4 bg-zinc-100 rounded w-2/3 sm:w-1/3"></div>
                 </div>
-                <div className="text-right space-y-2">
+                <div className="text-right space-y-2 flex-shrink-0">
                   <div className="h-6 bg-zinc-200 rounded w-20"></div>
                   <div className="h-4 bg-zinc-100 rounded w-12 ml-auto"></div>
                 </div>
               </div>
             ))
           ) : filteredOrders.length === 0 ? (
-            <div className="bg-zinc-50 rounded-3xl p-12 text-center">
+            <div className="bg-zinc-50 rounded-3xl p-8 sm:p-12 text-center">
               <Package className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
               <p className="text-zinc-500 font-light">Bu filtreyle eşleşen sipariş bulunamadı.</p>
             </div>
@@ -241,35 +241,35 @@ export default function AdminSiparislerPage() {
                   {/* Sipariş Başlığı */}
                   <button
                     onClick={() => toggleExpand(order.id)}
-                    className="w-full px-8 py-6 flex items-center gap-6 text-left"
+                    className="w-full px-5 py-4 sm:px-8 sm:py-6 flex items-start sm:items-center gap-3 sm:gap-6 text-left"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1.5">
-                        <p className="font-semibold text-zinc-900">{customerName}</p>
-                        <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${colorCls}`}>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-1.5">
+                        <p className="font-semibold text-zinc-900 min-w-0 truncate max-w-full">{customerName}</p>
+                        <span className={`text-xs font-semibold px-3 py-1 rounded-full border flex-shrink-0 whitespace-nowrap ${colorCls}`}>
                           {statusOptions.find((s) => s.value === order.status)?.label}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-zinc-400">
-                        <span className="font-mono">{order.id}</span>
-                        <span>•</span>
-                        <span>{formatDate(order.createdAt)}</span>
+                      <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-1 text-xs text-zinc-400">
+                        <span className="font-mono truncate max-w-[11rem] sm:max-w-none">{order.id}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="whitespace-nowrap">{formatDate(order.createdAt)}</span>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0 mr-4">
-                      <p className="text-lg font-bold text-zinc-900">₺{formatPrice(order.total)}</p>
-                      <p className="text-xs text-zinc-400">{order.items?.reduce((a, i) => a + i.quantity, 0) || 0} ürün</p>
+                    <div className="text-right flex-shrink-0 sm:mr-4">
+                      <p className="text-base sm:text-lg font-bold text-zinc-900 whitespace-nowrap">₺{formatPrice(order.total)}</p>
+                      <p className="text-xs text-zinc-400 whitespace-nowrap">{order.items?.reduce((a, i) => a + i.quantity, 0) || 0} ürün</p>
                     </div>
                     <ChevronDown
-                      className={`w-5 h-5 text-zinc-400 flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""
+                      className={`w-5 h-5 text-zinc-400 flex-shrink-0 mt-1 sm:mt-0 transition-transform ${isExpanded ? "rotate-180" : ""
                         }`}
                     />
                   </button>
 
                   {/* Genişletilmiş Detay */}
                   {isExpanded && (
-                    <div className="border-t border-zinc-100 px-8 py-6 bg-zinc-50/30">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="border-t border-zinc-100 px-5 py-5 sm:px-8 sm:py-6 bg-zinc-50/30">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
                         {/* Sol: Ürünler */}
                         <div>
                           <h4 className="text-sm font-semibold text-zinc-700 mb-4 uppercase tracking-wide">

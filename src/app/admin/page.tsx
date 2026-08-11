@@ -104,10 +104,10 @@ export default function AdminDashboard() {
   const recentOrders = orders.slice(0, 5);
 
   return (
-    <div className="p-8 md:p-12 w-full">
+    <div className="w-full">
       {/* Başlık */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Genel Bakış</h1>
+      <div className="mb-8 sm:mb-10">
+        <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Genel Bakış</h1>
         <p className="text-zinc-500 mt-2 font-light">
           Mağazanızın güncel durumunu buradan takip edebilirsiniz.
           {!loadingOrders && (
@@ -117,13 +117,13 @@ export default function AdminDashboard() {
       </div>
 
       {/* Özet Kartları */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
         {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
             <div
               key={idx}
-              className="bg-white border border-zinc-100 rounded-3xl p-8 shadow-sm flex flex-col gap-6 hover:shadow-md transition-shadow"
+              className="bg-white border border-zinc-100 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col gap-5 sm:gap-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center justify-between">
                 <span className="text-zinc-500 font-medium text-sm tracking-wide uppercase">
@@ -133,8 +133,8 @@ export default function AdminDashboard() {
                   <Icon className="w-5 h-5" />
                 </div>
               </div>
-              <div className="flex items-end justify-between">
-                <span className="text-4xl font-light text-zinc-900 tracking-tight">
+              <div className="flex items-end justify-between gap-3">
+                <span className="text-3xl sm:text-4xl font-light text-zinc-900 tracking-tight min-w-0 truncate">
                   {loadingOrders && (idx === 0 || idx === 1) ? (
                     <Loader2 className="w-8 h-8 animate-spin text-zinc-300" />
                   ) : (
@@ -142,7 +142,7 @@ export default function AdminDashboard() {
                   )}
                 </span>
                 <span
-                  className={`text-sm font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+                  className={`text-xs sm:text-sm font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 whitespace-nowrap ${
                     stat.positive
                       ? "text-green-600 bg-green-50"
                       : "text-amber-600 bg-amber-50"
@@ -163,14 +163,14 @@ export default function AdminDashboard() {
 
       {/* Son Siparişler */}
       <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
-        <div className="px-8 py-6 border-b border-zinc-100 flex items-center justify-between">
-          <h2 className="font-semibold text-lg text-zinc-900">
+        <div className="px-5 py-5 sm:px-8 sm:py-6 border-b border-zinc-100 flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-base sm:text-lg text-zinc-900 min-w-0 truncate">
             Son Siparişler
             {loadingOrders && <Loader2 className="inline ml-2 w-4 h-4 animate-spin text-zinc-300" />}
           </h2>
           <a
             href="/admin/siparisler"
-            className="text-sm text-blue-600 font-medium hover:text-blue-700 transition-colors"
+            className="text-sm text-blue-600 font-medium hover:text-blue-700 transition-colors flex-shrink-0 whitespace-nowrap -my-3 py-3"
           >
             Tümünü Gör →
           </a>
@@ -180,16 +180,18 @@ export default function AdminDashboard() {
           {loadingOrders ? (
             /* İskelet yükleniyor */
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="px-8 py-5 flex items-center gap-6 animate-pulse">
+              <div key={i} className="px-5 py-4 sm:px-8 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 animate-pulse">
                 <div className="flex-1 space-y-2">
                   <div className="h-3.5 bg-zinc-100 rounded w-1/3" />
                   <div className="h-3 bg-zinc-50 rounded w-1/4" />
                 </div>
-                <div className="space-y-2 text-right">
-                  <div className="h-3.5 bg-zinc-100 rounded w-20 ml-auto" />
-                  <div className="h-3 bg-zinc-50 rounded w-12 ml-auto" />
+                <div className="flex items-center justify-between gap-4 sm:contents">
+                  <div className="space-y-2 text-left sm:text-right">
+                    <div className="h-3.5 bg-zinc-100 rounded w-20 sm:ml-auto" />
+                    <div className="h-3 bg-zinc-50 rounded w-12 sm:ml-auto" />
+                  </div>
+                  <div className="h-6 bg-zinc-100 rounded-full w-20 flex-shrink-0" />
                 </div>
-                <div className="h-6 bg-zinc-100 rounded-full w-20" />
               </div>
             ))
           ) : recentOrders.length === 0 ? (
@@ -198,18 +200,20 @@ export default function AdminDashboard() {
             </div>
           ) : (
             recentOrders.map((order) => (
-              <div key={order.id} className="px-8 py-5 flex items-center gap-6 hover:bg-zinc-50/50 transition-colors">
+              <div key={order.id} className="px-5 py-4 sm:px-8 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 hover:bg-zinc-50/50 transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-zinc-900 truncate">{order.customerName}</p>
-                  <p className="text-xs text-zinc-400 mt-0.5 font-mono">#{order.id.slice(0, 10).toUpperCase()}</p>
+                  <p className="text-xs text-zinc-400 mt-0.5 font-mono truncate">#{order.id.slice(0, 10).toUpperCase()}</p>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-zinc-900">₺{formatPrice(order.total)}</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {order.items?.reduce((a, i) => a + i.quantity, 0) ?? 0} ürün
-                  </p>
+                <div className="flex items-center justify-between gap-4 sm:contents">
+                  <div className="text-left sm:text-right flex-shrink-0">
+                    <p className="text-sm font-semibold text-zinc-900">₺{formatPrice(order.total)}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {order.items?.reduce((a, i) => a + i.quantity, 0) ?? 0} ürün
+                    </p>
+                  </div>
+                  <StatusBadge status={order.status} />
                 </div>
-                <StatusBadge status={order.status} />
               </div>
             ))
           )}
@@ -229,7 +233,7 @@ function StatusBadge({ status }: { status: string }) {
   };
   const c = config[status] || config.beklemede;
   return (
-    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${c.cls}`}>
+    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border flex-shrink-0 whitespace-nowrap ${c.cls}`}>
       {c.label}
     </span>
   );

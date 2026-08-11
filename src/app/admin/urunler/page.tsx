@@ -340,11 +340,11 @@ export default function AdminUrunlerPage() {
   if (!mounted) return null;
 
   return (
-    <div className="p-8 md:p-12 w-full relative">
+    <div className="w-full relative">
 
       {/* ═══ Toast ═══ */}
       <div
-        className={`fixed top-6 right-6 z-[200] flex items-center gap-3 border shadow-xl rounded-2xl px-6 py-4 transition-all duration-500 ${
+        className={`fixed top-4 left-4 right-4 sm:top-6 sm:left-auto sm:right-6 sm:max-w-sm z-[200] flex items-center gap-3 border shadow-xl rounded-2xl px-5 py-4 sm:px-6 transition-all duration-500 ${
           showToast ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0 pointer-events-none"
         } ${
           toastType === "warning"
@@ -353,33 +353,33 @@ export default function AdminUrunlerPage() {
         }`}
       >
         <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${toastType === "warning" ? "text-amber-500" : "text-green-500"}`} />
-        <span className="text-sm font-medium text-zinc-900">{toastMsg}</span>
+        <span className="text-sm font-medium text-zinc-900 min-w-0">{toastMsg}</span>
       </div>
 
       {/* ═══ Başlık ═══ */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Ürün Yönetimi</h1>
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Ürün Yönetimi</h1>
           <p className="text-zinc-500 mt-2 font-light">
             Mağazanızdaki {products.length} ürünü buradan yönetebilirsiniz.
           </p>
         </div>
-        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+        <div className="flex items-center gap-3 w-full md:w-auto self-start md:self-auto flex-wrap">
           {!loading && products.length === 0 && (
             <button
               onClick={handleSeedProducts}
               disabled={isSeeding}
-              className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3.5 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-4 focus:ring-blue-200 shadow-md disabled:opacity-60"
+              className="flex flex-1 md:flex-none items-center justify-center gap-2 bg-blue-600 text-white px-5 sm:px-6 py-3.5 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-4 focus:ring-blue-200 shadow-md disabled:opacity-60"
             >
-              <Upload className="w-4 h-4" />
+              <Upload className="w-4 h-4 flex-shrink-0" />
               {isSeeding ? "Yükleniyor..." : "Varsayılan Ürünleri Yükle"}
             </button>
           )}
           <button
             onClick={openAddForm}
-            className="flex items-center gap-2 bg-zinc-900 text-white px-6 py-3.5 rounded-xl font-semibold text-sm hover:bg-black transition-colors focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-md"
+            className="flex flex-1 md:flex-none items-center justify-center gap-2 bg-zinc-900 text-white px-5 sm:px-6 py-3.5 rounded-xl font-semibold text-sm hover:bg-black transition-colors focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-md"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 flex-shrink-0" />
             Yeni Ürün Ekle
           </button>
         </div>
@@ -387,14 +387,15 @@ export default function AdminUrunlerPage() {
 
       {/* ═══ Filtreler ═══ */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative w-full md:flex-1 md:max-w-md">
           <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+          {/* text-base: iOS Safari'nin 16px altı inputlarda otomatik zoom yapmasını önler */}
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Ürün adı veya ID ile ara..."
-            className="w-full bg-zinc-50 border border-zinc-100 outline-none focus:ring-2 focus:ring-blue-200 pl-11 pr-4 py-3 rounded-xl text-sm text-zinc-900 transition-all placeholder:text-zinc-400"
+            className="w-full bg-zinc-50 border border-zinc-100 outline-none focus:ring-2 focus:ring-blue-200 pl-11 pr-4 py-3 rounded-xl text-base lg:text-sm text-zinc-900 transition-all placeholder:text-zinc-400"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -419,13 +420,13 @@ export default function AdminUrunlerPage() {
       </p>
 
       {/* ═══ Öne Çıkan Ürünler Paneli ═══ */}
-      <div className="mb-8 bg-amber-50 border border-amber-200 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-            <h2 className="text-sm font-bold text-amber-900 uppercase tracking-wider">Öne Çıkan Ürünler</h2>
+      <div className="mb-8 bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <Star className="w-4 h-4 text-amber-500 fill-amber-500 flex-shrink-0" />
+            <h2 className="text-xs sm:text-sm font-bold text-amber-900 uppercase tracking-wider truncate">Öne Çıkan Ürünler</h2>
           </div>
-          <span className={`text-xs font-bold px-3 py-1 rounded-full ${featuredProducts.length >= 4 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+          <span className={`text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 ${featuredProducts.length >= 4 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
             {featuredProducts.length} / 4
           </span>
         </div>
@@ -441,8 +442,9 @@ export default function AdminUrunlerPage() {
                 <span className="text-xs font-medium text-zinc-800 truncate">{p.name}</span>
                 <button
                   onClick={() => handleToggleFeatured(p)}
-                  className="ml-auto flex-shrink-0 text-amber-400 hover:text-red-400 transition-colors"
+                  className="ml-auto -mr-1.5 flex-shrink-0 p-2.5 rounded-lg text-amber-400 hover:text-red-400 hover:bg-red-50 transition-colors"
                   title="Öne çıkandan kaldır"
+                  aria-label={`${p.name} ürününü öne çıkandan kaldır`}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -457,14 +459,119 @@ export default function AdminUrunlerPage() {
         )}
       </div>
 
-      {/* ═══ Tablo ═══ */}
-      <div className="bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
-        <table className="w-full">
+      {/* ═══ Ürün Listesi — mobilde kart, md+ tablo ═══ */}
+
+      {/* Dokunmatik kart görünümü (< lg) — tablette 2 kolon */}
+      <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-3">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white border border-zinc-100 rounded-2xl shadow-sm p-4 flex gap-4 animate-pulse">
+              <div className="w-16 h-16 rounded-xl bg-zinc-100 flex-shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="h-4 bg-zinc-200 rounded w-3/4" />
+                <div className="h-3 bg-zinc-100 rounded w-1/3" />
+                <div className="h-6 bg-zinc-50 rounded-full w-1/2" />
+              </div>
+            </div>
+          ))
+        ) : products.length === 0 ? (
+          <div className="md:col-span-2 bg-white border border-zinc-100 rounded-2xl shadow-sm px-5 py-12 text-center">
+            <p className="text-zinc-400 font-light mb-4">Firebase&apos;de henüz ürün yok.</p>
+            <button
+              onClick={handleSeedProducts}
+              disabled={isSeeding}
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors disabled:opacity-60"
+            >
+              <Upload className="w-4 h-4" />
+              {isSeeding ? "Yükleniyor..." : "Varsayılan Ürünleri Yükle"}
+            </button>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="md:col-span-2 bg-white border border-zinc-100 rounded-2xl shadow-sm px-5 py-12 text-center text-sm text-zinc-400 font-light">
+            Bu filtreyle eşleşen ürün bulunamadı.
+          </div>
+        ) : (
+          filteredProducts.map((product) => (
+            <article key={product.id} className="bg-white border border-zinc-100 rounded-2xl shadow-sm p-4">
+              <div className="flex gap-4">
+                <div className="relative w-16 h-16 flex-shrink-0">
+                  <div className="w-16 h-16 rounded-xl bg-zinc-100 overflow-hidden relative">
+                    <Image src={product.images?.[0] || "/zenna.png"} alt={product.name} fill sizes="64px" className="object-cover" />
+                  </div>
+                  {(product.images?.length ?? 0) > 1 && (
+                    <span className="absolute -bottom-1 -right-1 text-[9px] font-bold bg-zinc-900 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                      {product.images.length}
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-zinc-900 leading-snug break-words">{product.name}</p>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 font-mono truncate">{product.stockCode || product.id}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span className="text-[11px] bg-zinc-50 text-zinc-600 px-2.5 py-1 rounded-full border border-zinc-100 font-medium">
+                      {product.category}
+                    </span>
+                    <span className="text-sm font-bold text-zinc-900">₺{formatPrice(product.price)}</span>
+                    {product.featured && (
+                      <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                        Öne Çıkan
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Aksiyonlar — dokunma alanları min 44px */}
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-50">
+                <button
+                  onClick={() => setDetailProduct(product)}
+                  className="flex-1 min-w-0 h-11 rounded-xl text-[11px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Eye className="w-4 h-4 flex-shrink-0" />
+                  Detay
+                </button>
+                <button
+                  onClick={() => openEditForm(product)}
+                  className="flex-1 min-w-0 h-11 rounded-xl text-[11px] font-semibold text-amber-600 bg-amber-50 hover:bg-amber-100 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Pencil className="w-4 h-4 flex-shrink-0" />
+                  Düzenle
+                </button>
+                <button
+                  onClick={() => handleToggleFeatured(product)}
+                  aria-label={product.featured ? "Öne çıkandan kaldır" : "Öne çıkan yap"}
+                  className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center transition-colors ${
+                    product.featured
+                      ? "text-amber-500 bg-amber-50 hover:bg-amber-100"
+                      : "text-zinc-400 bg-zinc-50 hover:text-amber-500 hover:bg-amber-50"
+                  }`}
+                >
+                  <Star className={`w-4 h-4 ${product.featured ? "fill-amber-500" : ""}`} />
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm(product.id)}
+                  aria-label="Ürünü sil"
+                  className="w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+
+      {/* Masaüstü tablo (lg+) — taşma olursa yalnız tablo container'ı kayar */}
+      <div className="hidden lg:block bg-white border border-zinc-100 rounded-3xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-zinc-100 text-left">
               <th className="px-6 py-5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Ürün</th>
               <th className="px-6 py-5 text-xs font-semibold text-zinc-500 uppercase tracking-wider hidden md:table-cell">Kategori</th>
-              <th className="px-6 py-5 text-xs font-semibold text-zinc-500 uppercase tracking-wider hidden lg:table-cell">Özellikler</th>
+              <th className="px-6 py-5 text-xs font-semibold text-zinc-500 uppercase tracking-wider hidden xl:table-cell">Özellikler</th>
               <th className="px-6 py-5 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-right">Fiyat</th>
               <th className="px-6 py-5 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-center hidden md:table-cell">Öne Çıkan</th>
               <th className="px-6 py-5 text-xs font-semibold text-zinc-500 uppercase tracking-wider text-center">İşlemler</th>
@@ -484,7 +591,7 @@ export default function AdminUrunlerPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 hidden md:table-cell"><div className="h-6 bg-zinc-100 rounded-full w-20" /></td>
-                  <td className="px-6 py-4 hidden lg:table-cell"><div className="flex gap-1.5"><div className="w-12 h-5 bg-zinc-100 rounded-full" /><div className="w-12 h-5 bg-zinc-100 rounded-full" /></div></td>
+                  <td className="px-6 py-4 hidden xl:table-cell"><div className="flex gap-1.5"><div className="w-12 h-5 bg-zinc-100 rounded-full" /><div className="w-12 h-5 bg-zinc-100 rounded-full" /></div></td>
                   <td className="px-6 py-4 text-right"><div className="h-5 bg-zinc-200 rounded w-16 ml-auto" /></td>
                   <td className="px-6 py-4"><div className="flex items-center justify-center gap-2"><div className="w-8 h-8 bg-zinc-100 rounded-lg" /><div className="w-8 h-8 bg-zinc-100 rounded-lg" /><div className="w-8 h-8 bg-zinc-100 rounded-lg" /></div></td>
                 </tr>
@@ -529,7 +636,7 @@ export default function AdminUrunlerPage() {
                     {product.category}
                   </span>
                 </td>
-                <td className="px-6 py-4 hidden lg:table-cell">
+                <td className="px-6 py-4 hidden xl:table-cell">
                   <div className="flex gap-1.5 flex-wrap">
                     {product.features?.slice(0, 2).map((f) => (
                       <span key={f} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">{f}</span>
@@ -569,15 +676,16 @@ export default function AdminUrunlerPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* ═══ Silme Onay Modalı ═══ */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
-          <div className="relative bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center space-y-4">
+          <div className="relative bg-white rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-sm max-h-[90vh] overflow-y-auto text-center space-y-4">
             <Trash2 className="w-10 h-10 text-red-400 mx-auto" />
-            <h3 className="text-lg font-bold text-zinc-900">Ürünü Silmek İstediğinize Emin Misiniz?</h3>
+            <h3 className="text-base sm:text-lg font-bold text-zinc-900">Ürünü Silmek İstediğinize Emin Misiniz?</h3>
             <p className="text-sm text-zinc-500 font-light">Bu işlem geri alınamaz.</p>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3.5 rounded-xl text-sm font-medium text-zinc-600 hover:bg-zinc-50 border border-zinc-200 transition-colors">
@@ -595,11 +703,19 @@ export default function AdminUrunlerPage() {
       {detailProduct && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDetailProduct(null)} />
-          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl">
+            {/* Kapatma — modal kaydırılsa bile erişilebilir kalsın diye sabit köşede */}
+            <button
+              onClick={() => setDetailProduct(null)}
+              aria-label="Kapat"
+              className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
             {/* Görsel carousel — birden fazla resim varsa yan yana scroll */}
-            <div className="flex overflow-x-auto gap-0 snap-x snap-mandatory">
+            <div className="flex overflow-x-auto gap-0 snap-x snap-mandatory rounded-t-3xl">
               {(detailProduct.images?.length > 0 ? detailProduct.images : ["/zenna.png"]).map((src, i) => (
-                <div key={i} className="relative w-full flex-shrink-0 h-64 bg-zinc-100 snap-start">
+                <div key={i} className="relative w-full flex-shrink-0 h-56 sm:h-64 bg-zinc-100 snap-start">
                   <Image src={src} alt={`${detailProduct.name} ${i + 1}`} fill className="object-cover" />
                   {detailProduct.images?.length > 1 && (
                     <span className="absolute bottom-3 right-3 text-[10px] font-bold bg-black/50 text-white px-2 py-0.5 rounded-full">
@@ -609,13 +725,13 @@ export default function AdminUrunlerPage() {
                 </div>
               ))}
             </div>
-            <div className="p-8 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-zinc-900">{detailProduct.name}</h2>
-                  <p className="text-xs text-zinc-400 font-mono mt-1">{detailProduct.stockCode || detailProduct.id}</p>
+            <div className="p-5 sm:p-8 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-zinc-900 break-words">{detailProduct.name}</h2>
+                  <p className="text-xs text-zinc-400 font-mono mt-1 truncate">{detailProduct.stockCode || detailProduct.id}</p>
                 </div>
-                <span className="text-lg font-bold text-zinc-900">₺{formatPrice(detailProduct.price)}</span>
+                <span className="text-lg font-bold text-zinc-900 flex-shrink-0 whitespace-nowrap">₺{formatPrice(detailProduct.price)}</span>
               </div>
               <p className="text-sm text-zinc-500 font-light leading-relaxed">{detailProduct.description}</p>
               <div className="flex flex-wrap gap-2 pt-2">
@@ -626,11 +742,11 @@ export default function AdminUrunlerPage() {
                 ))}
               </div>
               <div className="flex gap-3 pt-4">
-                <button onClick={() => openEditForm(detailProduct)} className="flex-1 bg-zinc-900 text-white py-3.5 rounded-xl font-medium hover:bg-black transition-colors flex items-center justify-center gap-2">
-                  <Pencil className="w-4 h-4" />
+                <button onClick={() => openEditForm(detailProduct)} className="flex-1 min-w-0 bg-zinc-900 text-white py-3.5 rounded-xl font-medium text-sm hover:bg-black transition-colors flex items-center justify-center gap-2">
+                  <Pencil className="w-4 h-4 flex-shrink-0" />
                   Düzenle
                 </button>
-                <button onClick={() => setDetailProduct(null)} className="px-6 py-3.5 rounded-xl text-sm font-medium text-zinc-600 hover:bg-zinc-50 border border-zinc-200 transition-colors">
+                <button onClick={() => setDetailProduct(null)} className="px-5 sm:px-6 py-3.5 rounded-xl text-sm font-medium text-zinc-600 hover:bg-zinc-50 border border-zinc-200 transition-colors flex-shrink-0">
                   Kapat
                 </button>
               </div>
@@ -651,19 +767,20 @@ export default function AdminUrunlerPage() {
           isFormOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-8 py-6 border-b border-zinc-100">
-          <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 sm:px-8 sm:py-6 border-b border-zinc-100 flex-shrink-0">
+          <h2 className="text-lg sm:text-xl font-bold text-zinc-900 tracking-tight truncate min-w-0">
             {editingProduct ? "Ürünü Düzenle" : "Yeni Ürün Ekle"}
           </h2>
           <button
             onClick={resetAndCloseForm}
-            className="w-10 h-10 rounded-full hover:bg-zinc-100 flex items-center justify-center text-zinc-500 transition-colors"
+            aria-label="Kapat"
+            className="w-11 h-11 flex-shrink-0 rounded-full hover:bg-zinc-100 flex items-center justify-center text-zinc-500 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form id="product-form" onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto px-8 py-8 space-y-6">
+        <form id="product-form" onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto px-5 py-6 sm:px-8 sm:py-8 space-y-6">
 
           {/* ── Çoklu Görsel Yükleme ─────────────────────────────── */}
           <div>
@@ -780,8 +897,8 @@ export default function AdminUrunlerPage() {
             </select>
           </div>
 
-          {/* Fiyat & Stok Kodu */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Fiyat & Stok Kodu — dar ekranda tek kolon */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-2">Fiyat (₺)</label>
               <input
@@ -844,18 +961,18 @@ export default function AdminUrunlerPage() {
           </div>
         </form>
 
-        <div className="px-8 py-6 border-t border-zinc-100 flex items-center gap-4">
+        <div className="px-5 py-4 sm:px-8 sm:py-6 border-t border-zinc-100 flex items-center gap-2 sm:gap-4 flex-shrink-0">
           <button
             type="button"
             onClick={resetAndCloseForm}
-            className="px-6 py-4 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="px-4 sm:px-6 py-4 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors flex-shrink-0"
           >
             Vazgeç
           </button>
           <button
             type="submit"
             form="product-form"
-            className="flex-1 bg-zinc-900 text-white py-4 rounded-xl font-semibold text-base hover:bg-black transition-colors focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-md"
+            className="flex-1 min-w-0 bg-zinc-900 text-white py-4 rounded-xl font-semibold text-sm sm:text-base hover:bg-black transition-colors focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-md"
           >
             {editingProduct ? "Değişiklikleri Kaydet" : "Ürünü Kaydet"}
           </button>
