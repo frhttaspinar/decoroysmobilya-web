@@ -1,4 +1,12 @@
 import React from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Gizlilik Politikası",
+  description:
+    "Decoroys gizlilik politikası: kişisel verilerin toplanması, kullanılması ve korunması.",
+  alternates: { canonical: "/kurumsal/gizlilik-politikasi" },
+};
 
 export default function GizlilikPolitikasi() {
   return (

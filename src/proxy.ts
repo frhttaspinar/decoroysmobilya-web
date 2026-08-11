@@ -1,5 +1,5 @@
 /**
- * Next.js 16 Proxy — Admin Route Güvenlik Katmanı
+ * Next.js 16 Proxy — Admin Route Güvenlik Katmanı + Eski URL Yönlendirmeleri
  *
  * Next.js 16'da middleware yerine proxy.ts kullanılır.
  * Bu dosya projedeki TEK güvenlik duvarı katmanıdır (edge seviyesinde).
@@ -17,8 +17,43 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+/**
+ * Eski OpenCart URL'lerinin kalıcı karşılıkları.
+ *
+ * Eski sistemde rota bilgisi path'te değil `?route=` query parametresinde
+ * taşınıyordu; bu yüzden eşleşme query üzerinden yapılır.
+ * SADECE yeni sistemde kesin karşılığı olan rotalar buraya eklenir.
+ * Karşılığı belirsiz olanlar (ör. `product/product&product_id=...`) bilerek
+ * listelenmez ve 404 döner — rastgele ürüne ya da ana sayfaya yönlendirilmez.
+ */
+const LEGACY_OPENCART_ROUTES: Record<string, string> = {
+  "information/contact": "/kurumsal/iletisim",
+  "blog/home": "/blog",
+  "common/home": "/",
+};
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ─── Eski OpenCart /index.php URL'leri ───
+  // next.config redirects() proxy'den ÖNCE çalıştığı ve hedefe eski query
+  // string'ini eklediği için yönlendirme burada yapılır; böylece hedef URL
+  // temiz kalır ve tek adımda (308) doğru sayfaya ulaşılır.
+  if (pathname === "/index.php") {
+    const route = request.nextUrl.searchParams.get("route");
+    // route parametresi hiç yoksa: eski OpenCart ana sayfası.
+    const destination = route === null ? "/" : LEGACY_OPENCART_ROUTES[route];
+
+    if (destination) {
+      const url = request.nextUrl.clone();
+      url.pathname = destination;
+      url.search = ""; // eski route/product_id parametreleri taşınmaz
+      return NextResponse.redirect(url, 308);
+    }
+
+    // Bilinen bir karşılığı yok → yönlendirme yok, 404 olarak kalır.
+    return NextResponse.next();
+  }
 
   // ─── Magic Link Auth Callback — KESİNLİKLE engelleme ───
   // Firebase token URL'de taşınır; bu rotaya redirect/rewrite yapılırsa
@@ -42,5 +77,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/index.php"],
 };

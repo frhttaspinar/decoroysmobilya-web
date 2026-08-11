@@ -1,4 +1,12 @@
 import React from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "İptal ve İade Koşulları",
+  description:
+    "Decoroys siparişlerinde cayma hakkı, iptal ve iade süreçlerine ilişkin koşullar.",
+  alternates: { canonical: "/kurumsal/iptal-ve-iade-kosullari" },
+};
 
 export default function IptalVeIadeKosullari() {
   return (

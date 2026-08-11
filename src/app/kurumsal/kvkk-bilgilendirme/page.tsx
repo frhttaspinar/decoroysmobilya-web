@@ -1,4 +1,12 @@
 import React from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "KVKK Bilgilendirme",
+  description:
+    "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında Decoroys aydınlatma metni.",
+  alternates: { canonical: "/kurumsal/kvkk-bilgilendirme" },
+};
 
 export default function KvkkBilgilendirme() {
   return (

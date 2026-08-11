@@ -1,4 +1,12 @@
 import React from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Teslimat Bilgileri",
+  description:
+    "Decoroys siparişlerinde kargo, teslimat süresi ve teslimat koşulları hakkında bilgilendirme.",
+  alternates: { canonical: "/kurumsal/teslimat-bilgileri" },
+};
 
 export default function TeslimatKoşulları() {
   return (

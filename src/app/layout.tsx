@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Caveat } from "next/font/google";
 import "./globals.css";
 import MainLayoutWrapper from "@/components/MainLayoutWrapper";
+import { SITE_URL } from "@/lib/site";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const caveat = Caveat({
@@ -14,6 +15,11 @@ const caveat = Caveat({
    Metadata — Arama Motorları & Open Graph
 ═══════════════════════════════════════════════ */
 export const metadata: Metadata = {
+  // Göreli canonical/OG URL'lerinin tek bir canonical host üzerinden
+  // çözülmesini sağlar. alternates.canonical BİLEREK burada tanımlanmaz:
+  // root layout'ta tanımlanırsa kendi canonical'ını belirtmeyen tüm alt
+  // sayfalar "/" adresini canonical gösterirdi.
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Decoroys | Premium TV Ünitesi, Kahve Dolabı ve Özgün Mobilya Tasarımları",
     template: "%s | Decoroys",

@@ -1,4 +1,12 @@
 import React from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Mesafeli Satış Sözleşmesi",
+  description:
+    "Decoroys üzerinden yapılan alışverişlere ilişkin mesafeli satış sözleşmesi metni.",
+  alternates: { canonical: "/kurumsal/mesafeli-satis-sozlesmesi" },
+};
 
 export default function MesafeliSatisSozlesmesi() {
   return (

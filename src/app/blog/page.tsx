@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Blog | Dekorasyon ve Mobilya İlhamı",
   description:
     "Minimalist salon tasarımından akıllı depolama çözümlerine, renk uyumundan modern mobilya seçimine kadar tüm ilham ve ipuçları Decoroys Blog'da.",
+  alternates: { canonical: "/blog" },
 };
 
 interface Post {
