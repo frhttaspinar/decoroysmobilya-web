@@ -25,17 +25,45 @@ interface FirestoreOrderItem {
   size?: string | null;
 }
 
+type FulfillmentStatus = "beklemede" | "hazirlaniyor" | "kargoda" | "teslim-edildi" | "iptal";
+
 interface FirestoreOrder {
-  id: string; // Firestore doc ID
-  customerName: string;
+  id: string; // Firestore doc ID = PayTR merchant_oid
+  customerName?: string;                       // eski şema
+  customerInfo?: { name?: string } | null;     // yeni şema
   customerEmail?: string | null;
   total: number;
-  status: "beklemede" | "hazirlaniyor" | "kargoda" | "teslim-edildi" | "iptal";
+  /** Ödeme gerçeği — yalnız PayTR webhook'u yazar. */
+  paymentStatus?: "success" | "pending" | "failed" | "review_required";
+  /** Operasyon durumu. */
+  fulfillmentStatus?: FulfillmentStatus;
+  /** Eski kayıtlarda operasyon durumu burada tutuluyordu. */
+  status?: string;
   items: FirestoreOrderItem[];
   createdAt?: Timestamp | null;
   uid?: string | null;
   isGuest?: boolean;
 }
+
+/** Eski/yeni casing karışıklığını tek sözlüğe indirger. */
+function normalizeFulfillment(o: FirestoreOrder): FulfillmentStatus {
+  const raw = String(o.fulfillmentStatus ?? o.status ?? "beklemede").toLowerCase().trim();
+  const map: Record<string, FulfillmentStatus> = {
+    "beklemede": "beklemede",
+    "ödendi": "beklemede",
+    "odendi": "beklemede",
+    "hazirlaniyor": "hazirlaniyor",
+    "hazırlanıyor": "hazirlaniyor",
+    "kargoda": "kargoda",
+    "teslim-edildi": "teslim-edildi",
+    "teslim edildi": "teslim-edildi",
+    "iptal": "iptal",
+  };
+  return map[raw] ?? "beklemede";
+}
+
+const orderCustomerName = (o: FirestoreOrder) =>
+  o.customerInfo?.name || o.customerName || "Bilinmiyor";
 
 export default function AdminDashboard() {
   const { products } = useProductStore();
@@ -55,7 +83,9 @@ export default function AdminDashboard() {
           id: doc.id,
           ...(doc.data() as Omit<FirestoreOrder, "id">),
         }));
-        setOrders(firestoreOrders);
+        // Ciro / sipariş sayıları YALNIZ ödemesi doğrulanmış siparişlerden hesaplanır.
+        // Ödenmemiş veya başarısız kayıtlar sipariş gibi görünmez, sayılara girmez.
+        setOrders(firestoreOrders.filter((o) => o.paymentStatus === "success"));
         setLoadingOrders(false);
       },
       (err) => {
@@ -70,12 +100,13 @@ export default function AdminDashboard() {
   if (!mounted) return null;
 
   const totalRevenue = orders
-    .filter((o) => o.status !== "iptal")
+    .filter((o) => normalizeFulfillment(o) !== "iptal")
     .reduce((acc, o) => acc + (o.total ?? 0), 0);
 
-  const pendingOrders = orders.filter(
-    (o) => o.status === "beklemede" || o.status === "hazirlaniyor"
-  ).length;
+  const pendingOrders = orders.filter((o) => {
+    const f = normalizeFulfillment(o);
+    return f === "beklemede" || f === "hazirlaniyor";
+  }).length;
 
   const stats = [
     {
@@ -202,7 +233,7 @@ export default function AdminDashboard() {
             recentOrders.map((order) => (
               <div key={order.id} className="px-5 py-4 sm:px-8 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 hover:bg-zinc-50/50 transition-colors">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-zinc-900 truncate">{order.customerName}</p>
+                  <p className="text-sm font-medium text-zinc-900 truncate">{orderCustomerName(order)}</p>
                   <p className="text-xs text-zinc-400 mt-0.5 font-mono truncate">#{order.id.slice(0, 10).toUpperCase()}</p>
                 </div>
                 <div className="flex items-center justify-between gap-4 sm:contents">
@@ -212,7 +243,7 @@ export default function AdminDashboard() {
                       {order.items?.reduce((a, i) => a + i.quantity, 0) ?? 0} ürün
                     </p>
                   </div>
-                  <StatusBadge status={order.status} />
+                  <StatusBadge status={normalizeFulfillment(order)} />
                 </div>
               </div>
             ))

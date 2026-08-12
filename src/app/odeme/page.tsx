@@ -1,8 +1,7 @@
 "use client";
 
 import { useCartStore } from "@/store/useCartStore";
-import { db, auth } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { ShieldCheck, CreditCard, Loader2, Lock, X } from "lucide-react";
 import Link from "next/link";
@@ -57,55 +56,38 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Firebase'e siparişi kaydet — ödeme bekleniyor durumunda
-      const orderData = {
-        customerInfo: {
-          name:     fullName.trim(),
-          email:    email.trim(),
-          phone:    phone.trim(),
-          address:  address.trim(),
-          city:     city.trim(),
-          district: district.trim() || null,
-        },
-        items: items.map((item) => ({
-          id:       item.id,
-          name:     item.name,
-          price:    item.price,
-          quantity: item.quantity,
-          image:    item.image    ?? null,
-          color:    item.color    ?? null,
-          size:     item.size     ?? null,
-        })),
-        total,
-        status:    "Beklemede",
-        uid:       currentUser ? currentUser.uid : null,
-        isGuest:   !currentUser,
-        createdAt: serverTimestamp(),
-      };
-
-      const docRef   = await addDoc(collection(db, "orders"), orderData);
-      const newOrdId = docRef.id;
-
-      // 2. PayTR token al — hata varsa iFrame ASLA açılmaz
+      // Sipariş BURADA OLUŞTURULMAZ.
+      // Client artık `orders` koleksiyonuna hiçbir şey yazmaz; sunucu geçici bir
+      // payment_attempt açar ve gerçek sipariş yalnızca doğrulanmış PayTR success
+      // callback'inde yaratılır. Böylece iframe'i kapatan / ödemeyi yarıda bırakan
+      // kullanıcı admin Siparişler ekranında sipariş oluşturamaz.
+      //
+      // Fiyatlar sunucuda Firestore'dan yeniden okunur; buradaki tutar yalnızca
+      // sunucu toplamıyla karşılaştırılmak üzere gönderilir.
       const res = await fetch("/api/payment/paytr", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId:     newOrdId,
-          items:       orderData.items,
-          totalAmount: total,
+          items: items.map((item) => ({
+            id:       item.id,
+            quantity: item.quantity,
+            color:    item.color ?? null,
+            size:     item.size  ?? null,
+          })),
+          clientTotal: total,
           email:       email.trim(),
           fullName:    fullName.trim(),
           phone:       phone.trim(),
           address:     address.trim(),
           city:        city.trim(),
           district:    district.trim(),
+          uid:         currentUser ? currentUser.uid : null,
         }),
       });
 
-      const data = await res.json() as { token?: string; error?: string };
+      const data = await res.json() as { token?: string; merchantOid?: string; error?: string };
       if (!res.ok || !data.token) {
-        throw new Error("Ödeme sistemi başlatılamadı, lütfen daha sonra tekrar deneyin.");
+        throw new Error(data.error ?? "Ödeme sistemi başlatılamadı, lütfen daha sonra tekrar deneyin.");
       }
 
       setPaytrToken(data.token);

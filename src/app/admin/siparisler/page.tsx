@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, Package, MapPin, Loader2, Printer, Trash2 } from "lucide-react";
+import { ChevronDown, Package, MapPin, Printer, Trash2, ShieldCheck, Mail } from "lucide-react";
 import Image from "next/image";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { collection, onSnapshot, doc, updateDoc, query, orderBy, deleteDoc } from "firebase/firestore";
+
+export type FulfillmentStatus =
+  | "beklemede" | "hazirlaniyor" | "kargoda" | "teslim-edildi" | "iptal";
 
 export type Order = {
   id: string;
@@ -18,14 +21,66 @@ export type Order = {
   };
   items: any[];
   total: number;
-  status: "beklemede" | "hazirlaniyor" | "kargoda" | "teslim-edildi" | "iptal";
+  /** Ödeme gerçeği — SADECE PayTR webhook'u yazar, admin değiştiremez. */
+  paymentStatus?: "success" | "pending" | "failed" | "review_required";
+  /** Operasyon durumu — admin yalnızca bunu değiştirir. */
+  fulfillmentStatus?: FulfillmentStatus;
+  /** Eski kayıtlarda operasyon durumu burada tutuluyordu. */
+  status?: string;
+  paidAt?: any;
+  /** Sipariş tutarı — PayTR payment_amount ile doğrulanan değer. */
+  paytrPaymentAmount?: number;
+  /** Fiilen tahsil edilen toplam — taksitte sipariş tutarından yüksek olabilir. */
+  paytrChargedTotal?: number;
+  /** Legacy alan adı (eski kayıtlarda tahsil edilen toplam). */
+  paytrTotal?: number;
+  paytrPaymentDate?: string;
+  paytrCurrency?: string;
+  adminNotificationStatus?:
+    | "pending" | "sending" | "sent" | "failed" | "skipped_legacy_backfill";
+  adminNotificationError?: string;
+  paytrPaymentType?: string | null;
+  merchantOid?: string;
   createdAt: any;
 };
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(price);
 
-const statusOptions: { value: Order["status"]; label: string }[] = [
+/**
+ * Operasyon durumunu normalize eder.
+ * Eski kayıtlarda "Beklemede" / "beklemede" / "Ödendi" karışıklığı vardı;
+ * burada tek bir küçük harfli sözlüğe indirgenir. Veri SİLİNMEZ, yalnız okunurken eşlenir.
+ */
+function normalizeFulfillment(o: Order): FulfillmentStatus {
+  const raw = String(o.fulfillmentStatus ?? o.status ?? "beklemede").toLowerCase().trim();
+  const map: Record<string, FulfillmentStatus> = {
+    "beklemede": "beklemede",
+    "ödendi": "beklemede",       // eski ödeme etiketi → operasyonel olarak yeni sipariş
+    "odendi": "beklemede",
+    "hazirlaniyor": "hazirlaniyor",
+    "hazırlanıyor": "hazirlaniyor",
+    "kargoda": "kargoda",
+    "teslim-edildi": "teslim-edildi",
+    "teslim edildi": "teslim-edildi",
+    "iptal": "iptal",
+  };
+  return map[raw] ?? "beklemede";
+}
+
+/** Mail bildirim durumunun kullanıcıya gösterilecek karşılığı. */
+const NOTIFICATION_LABELS: Record<string, { label: string; cls: string }> = {
+  sent: { label: "Gönderildi", cls: "text-green-700 bg-green-50 border-green-200" },
+  failed: { label: "Gönderilemedi", cls: "text-red-700 bg-red-50 border-red-200" },
+  sending: { label: "Gönderiliyor", cls: "text-blue-700 bg-blue-50 border-blue-200" },
+  pending: { label: "Bekliyor", cls: "text-amber-700 bg-amber-50 border-amber-200" },
+  skipped_legacy_backfill: {
+    label: "Legacy — gönderilmedi",
+    cls: "text-zinc-600 bg-zinc-50 border-zinc-200",
+  },
+};
+
+const statusOptions: { value: FulfillmentStatus; label: string }[] = [
   { value: "beklemede", label: "Beklemede" },
   { value: "hazirlaniyor", label: "Hazırlanıyor" },
   { value: "kargoda", label: "Kargoda" },
@@ -49,6 +104,7 @@ export default function AdminSiparislerPage() {
   const [loading, setLoading] = useState(true);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -58,7 +114,12 @@ export default function AdminSiparislerPage() {
         id: doc.id,
         ...doc.data(),
       })) as Order[];
-      setOrders(fetchedOrders);
+
+      // ── İŞ KURALI: burada YALNIZ gerçekten ödenmiş siparişler bulunur ──
+      // Yeni mimaride orders koleksiyonuna zaten sadece doğrulanmış PayTR
+      // success kayıtları yazılır; bu filtre ek savunma katmanıdır ve ödemesi
+      // doğrulanmamış legacy kayıtların sipariş gibi görünmesini engeller.
+      setOrders(fetchedOrders.filter((o) => o.paymentStatus === "success"));
       setLoading(false);
     });
 
@@ -70,14 +131,44 @@ export default function AdminSiparislerPage() {
     setTimeout(() => setActionError(null), 4000);
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  // Admin YALNIZCA operasyon durumunu değiştirir. paymentStatus'a dokunulmaz —
+  // ödeme gerçeğinin tek yazarı PayTR webhook'udur.
+  const updateOrderStatus = async (orderId: string, newStatus: FulfillmentStatus) => {
     try {
       const orderRef = doc(db, "orders", orderId);
-      await updateDoc(orderRef, { status: newStatus });
+      await updateDoc(orderRef, { fulfillmentStatus: newStatus });
 
     } catch (err) {
       console.error("Sipariş durumu güncellenirken hata:", err);
       showError("Sipariş durumu güncellenemedi. Lütfen tekrar deneyin.");
+    }
+  };
+
+  /**
+   * Bildirim mailini elle yeniden gönderir.
+   * Yetki sunucuda doğrulanır; buradaki tek iş geçerli Firebase ID token'ı taşımaktır.
+   * Ödeme durumuna dokunmaz.
+   */
+  const handleResendNotification = async (orderId: string) => {
+    setResendingId(orderId);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Oturum bulunamadı, lütfen tekrar giriş yapın.");
+
+      const res = await fetch("/api/admin/resend-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ merchantOid: orderId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Bildirim gönderilemedi.");
+      if (data?.outcome === "in_progress") {
+        showError("Bildirim şu anda gönderiliyor, lütfen birkaç saniye bekleyin.");
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Bildirim gönderilemedi.");
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -102,7 +193,7 @@ export default function AdminSiparislerPage() {
   const filteredOrders =
     filterStatus === "Tümü"
       ? orders
-      : orders.filter((o) => o.status === filterStatus);
+      : orders.filter((o) => normalizeFulfillment(o) === filterStatus);
 
   const toggleExpand = (id: string) => {
     setExpandedOrder(expandedOrder === id ? null : id);
@@ -176,7 +267,7 @@ export default function AdminSiparislerPage() {
             const count =
               status === "Tümü"
                 ? orders.length
-                : orders.filter((o) => o.status === status).length;
+                : orders.filter((o) => normalizeFulfillment(o) === status).length;
             return (
               <button
                 key={status}
@@ -224,7 +315,8 @@ export default function AdminSiparislerPage() {
           ) : (
             filteredOrders.map((order) => {
               const isExpanded = expandedOrder === order.id;
-              const colorCls = statusColors[order.status] || statusColors.beklemede;
+              const fulfillment = normalizeFulfillment(order);
+              const colorCls = statusColors[fulfillment] || statusColors.beklemede;
               // Handle fallback if data was inserted via old method without customerInfo
               const customerName = order.customerInfo?.name || (order as any).customerName || "Bilinmiyor";
               const customerEmail = order.customerInfo?.email || (order as any).customerEmail || "Bilinmiyor";
@@ -247,7 +339,11 @@ export default function AdminSiparislerPage() {
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-1.5">
                         <p className="font-semibold text-zinc-900 min-w-0 truncate max-w-full">{customerName}</p>
                         <span className={`text-xs font-semibold px-3 py-1 rounded-full border flex-shrink-0 whitespace-nowrap ${colorCls}`}>
-                          {statusOptions.find((s) => s.value === order.status)?.label}
+                          {statusOptions.find((s) => s.value === fulfillment)?.label}
+                        </span>
+                        {/* Ödeme rozeti — backend paymentStatus'undan gelir, UI uydurmaz */}
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full border border-green-200 bg-green-50 text-green-700 flex-shrink-0 whitespace-nowrap">
+                          ✓ Ödendi
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-4 gap-y-1 text-xs text-zinc-400">
@@ -302,6 +398,85 @@ export default function AdminSiparislerPage() {
 
                         {/* Sağ: Müşteri & Durum */}
                         <div className="space-y-6">
+                          {/* ═══ Ödeme Onayı — kaynak: backend paymentStatus ═══ */}
+                          <div>
+                            <h4 className="text-sm font-semibold text-zinc-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                              <ShieldCheck className="w-4 h-4 text-green-600" />
+                              Ödeme
+                            </h4>
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-1.5">
+                              <p className="text-sm font-bold text-green-800">ÖDEME ONAYLANDI — PAYTR</p>
+                              <div className="text-sm text-green-700 font-light space-y-0.5">
+                                {(() => {
+                                  const orderAmt = order.paytrPaymentAmount ?? order.total;
+                                  const charged = order.paytrChargedTotal ?? order.paytrTotal ?? orderAmt;
+                                  const cur = order.paytrCurrency ? ` ${order.paytrCurrency}` : "";
+                                  return (
+                                    <>
+                                      <p>
+                                        <span className="text-green-600">Sipariş Tutarı: </span>
+                                        <span className="font-semibold">₺{formatPrice(orderAmt)}{cur}</span>
+                                      </p>
+                                      <p>
+                                        <span className="text-green-600">Tahsil Edilen: </span>
+                                        <span className="font-semibold">₺{formatPrice(charged)}{cur}</span>
+                                        {Math.abs(charged - orderAmt) > 0.01 && (
+                                          <span className="ml-1 text-xs text-green-600">
+                                            (taksit farkı dahil)
+                                          </span>
+                                        )}
+                                      </p>
+                                    </>
+                                  );
+                                })()}
+                                <p>
+                                  <span className="text-green-600">Ödeme Tarihi: </span>
+                                  <span className="font-semibold">
+                                    {formatDate(order.paidAt) || order.paytrPaymentDate || "—"}
+                                  </span>
+                                </p>
+                                {order.paytrPaymentType && (
+                                  <p>
+                                    <span className="text-green-600">Ödeme Yöntemi: </span>
+                                    <span className="font-semibold uppercase">{order.paytrPaymentType}</span>
+                                  </p>
+                                )}
+                                <p className="break-all">
+                                  <span className="text-green-600">merchant_oid: </span>
+                                  <span className="font-mono text-xs">{order.merchantOid ?? order.id}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Mail bildirim durumu + elle tekrar gönderme */}
+                            {(() => {
+                              const key = order.adminNotificationStatus ?? "pending";
+                              const info = NOTIFICATION_LABELS[key] ?? NOTIFICATION_LABELS.pending;
+                              const busy = resendingId === order.id;
+                              return (
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                  <span className="text-xs text-zinc-500">Mail bildirimi:</span>
+                                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${info.cls}`}>
+                                    {info.label}
+                                  </span>
+                                  <button
+                                    onClick={() => handleResendNotification(order.id)}
+                                    disabled={busy}
+                                    className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-60"
+                                  >
+                                    <Mail className="w-3.5 h-3.5" />
+                                    {busy ? "Gönderiliyor..." : "Tekrar Gönder"}
+                                  </button>
+                                  {order.adminNotificationError && (
+                                    <p className="basis-full text-xs text-red-600 font-light break-words">
+                                      {order.adminNotificationError}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
                           <div>
                             <h4 className="text-sm font-semibold text-zinc-700 mb-3 uppercase tracking-wide flex items-center gap-2">
                               <MapPin className="w-4 h-4" />
@@ -318,7 +493,7 @@ export default function AdminSiparislerPage() {
 
                           <div>
                             <h4 className="text-sm font-semibold text-zinc-700 mb-3 uppercase tracking-wide">
-                              İşlemler & Durum
+                              İşlemler & Kargo Durumu
                             </h4>
                             <div className="flex flex-col gap-4">
                               <div className="flex items-center gap-2">
@@ -344,7 +519,7 @@ export default function AdminSiparislerPage() {
                                   <button
                                     key={opt.value}
                                     onClick={() => updateOrderStatus(order.id, opt.value)}
-                                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${order.status === opt.value
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${fulfillment === opt.value
                                       ? statusColors[opt.value]
                                       : "bg-zinc-50 text-zinc-500 border-zinc-100 hover:bg-zinc-100"
                                       }`}

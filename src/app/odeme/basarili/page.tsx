@@ -5,13 +5,25 @@ import { useCartStore } from "@/store/useCartStore";
 import { motion } from "motion/react";
 import Link from "next/link";
 
+/**
+ * ⚠️ Bu sayfa ödeme gerçeğinin KAYNAĞI DEĞİLDİR.
+ *
+ * Hiçbir sipariş yazmaz, hiçbir Firestore kaydı oluşturmaz ve hiçbir mail
+ * tetiklemez. Kullanıcı bu URL'yi elle açsa bile admin Siparişler ekranında
+ * sipariş oluşmaz. Siparişin gerçekten oluşması yalnızca sunucu tarafında,
+ * doğrulanmış PayTR callback'i ile gerçekleşir (/api/payment/webhook).
+ *
+ * Burada yapılan tek yan etki sepeti temizlemektir — bu tamamen yerel bir
+ * kullanıcı arayüzü durumudur.
+ */
 export default function PaymentSuccessPage() {
   const clearCart = useCartStore((s) => s.clearCart);
 
   useEffect(() => {
-    // PayTR iFrame içinde yüklendiyse üst pencereye çık
+    // PayTR iFrame içinde yüklendiyse üst pencereye çık — merchant_ok_url'deki
+    // orderId sorgu parametresi korunur.
     if (typeof window !== "undefined" && window.top !== window.self) {
-      window.top!.location.href = "/odeme/basarili";
+      window.top!.location.href = `/odeme/basarili${window.location.search}`;
       return;
     }
     clearCart();
@@ -73,10 +85,10 @@ export default function PaymentSuccessPage() {
           className="space-y-3"
         >
           <h1 className="text-3xl font-semibold text-zinc-900 tracking-tight">
-            Ödemeniz Başarıyla Alındı
+            Ödemeniz Alındı
           </h1>
           <p className="text-zinc-500 font-light leading-relaxed">
-            Siparişiniz onaylandı ve hazırlanmaya başlandı.
+            Ödemeniz bankadan onaylandı ve siparişiniz kaydediliyor.
             <br />
             Sipariş detaylarınız kayıtlı e-posta adresinize iletilecektir.
           </p>
