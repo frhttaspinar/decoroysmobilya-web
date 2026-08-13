@@ -1,13 +1,12 @@
 "use client";
 
 import { Product } from "@/data/products";
-import { displayPrice, hasPriceRange, requiresVariantChoice, soleVariant } from "@/lib/product-pricing";
+import { productSize, productColor } from "@/lib/product-pricing";
 import { useProductStore } from "@/store/useProductStore";
 import { useCartStore } from "@/store/useCartStore";
 import { useDrawerStore } from "@/store/useDrawerStore";
 import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(price);
@@ -21,32 +20,25 @@ export default function KategoriClient({ slug: _slug, categoryName }: Props) {
   const { products, loading } = useProductStore();
   const { addItem } = useCartStore();
   const { openDrawer } = useDrawerStore();
-  const router = useRouter();
 
   const filtered = products.filter(
     (p) => p.category.toLowerCase() === categoryName.toLowerCase()
   );
 
+  // Her ürün tek fiyat + tek ölçü + tek renk taşır; seçim gerekmez.
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Ölçü seçimi gereken ürün listeden doğrudan sepete eklenemez —
-    // müşteri ölçüyü ürün sayfasında açıkça seçmelidir.
-    if (requiresVariantChoice(product)) {
-      router.push(`/urun/${product.id}`);
-      return;
-    }
-    const only = soleVariant(product);
     addItem({
       id: product.id,
       name: product.name,
-      price: only ? only.price : product.price,
+      price: product.price,
       quantity: 1,
       image: product.images[0],
-      color: product.colors[0],
-      size: only?.size,
-      variantId: only?.id,
+      color: productColor(product) ?? undefined,
+      size: productSize(product) ?? undefined,
+      stockCode: product.stockCode,
     });
     openDrawer("cart");
   };
@@ -157,10 +149,7 @@ export default function KategoriClient({ slug: _slug, categoryName }: Props) {
 
                   <div className="mt-auto pt-4 border-t border-zinc-50">
                     <span className="text-base font-bold text-zinc-900">
-                      {hasPriceRange(product) && (
-                        <span className="text-xs font-normal text-zinc-400 mr-1">başlayan</span>
-                      )}
-                      {formatPrice(displayPrice(product))} ₺
+                      {formatPrice(product.price)} ₺
                     </span>
                   </div>
                 </div>

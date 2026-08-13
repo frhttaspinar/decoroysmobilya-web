@@ -1,33 +1,28 @@
 /**
- * Ölçü bazlı fiyat varyantı.
- * Örn: aynı ürünün 180x30 cm ve 200x30 cm ölçüleri farklı fiyatlı olabilir.
+ * VERİ MODELİ: 1 ÜRÜN = 1 FİYAT + 1 ÖLÇÜ + 1 RENK.
+ *
+ * Bir ürün içinde birden fazla ölçü veya renk YOKTUR. Farklı ölçü/renk
+ * satılacaksa admin ayrı bir ürün dokümanı oluşturur ve bu ürünlerin
+ * fiyatları tamamen bağımsızdır.
  */
-export interface ProductVariant {
-  /** Ürün içinde stabil kimlik — sipariş anında snapshot'a yazılır. */
-  id: string;
-  /** Görünen ölçü etiketi, ör. "200x30 cm". */
-  size: string;
-  /** Bu ölçünün gerçek satış fiyatı (TL). */
-  price: number;
-}
-
 export interface Product {
   id: string;
   name: string;
-  /**
-   * Taban/liste fiyatı. GERİYE UYUMLULUK için korunur:
-   * `variants` tanımlı DEĞİLSE gerçek satış fiyatı budur.
-   * `variants` varsa gerçek fiyat seçilen variant.price'tır.
-   */
+  /** Ürünün TEK satış fiyatı (TL). */
   price: number;
-  /** Ölçü seçenekleri. Tanımsız veya boşsa ürün tek fiyatlıdır (eski davranış). */
-  variants?: ProductVariant[];
+  /** Ürünün TEK ölçüsü, ör. "200x30 cm". Girilmemişse gösterilmez. */
+  size?: string;
+  /** Ürünün TEK rengi, ör. "Kahverengi". Girilmemişse gösterilmez. */
+  color?: string;
   images: string[];
   category: string;
   description: string;
+  /** Genel ürün özellikleri (Dolaplı, MDF...). Ölçü kaynağı DEĞİLDİR. */
   features: string[];
-  colors: string[];
+  /** @deprecated Legacy çoklu renk listesi — mağaza mantığında OKUNMAZ. */
+  colors?: string[];
   featured?: boolean;
+  stockCode?: string;
 }
 
 export const products: Product[] = [

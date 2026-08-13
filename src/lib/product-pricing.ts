@@ -1,67 +1,55 @@
-import type { ProductVariant } from "@/data/products";
-
 /**
- * Ölçü varyantlı fiyatlandırma yardımcıları — client ve server ortak.
+ * Ürün alan okuyucuları — client ve server ortak.
  *
- * GERİYE UYUMLULUK SÖZLEŞMESİ:
- *  - `variants` yoksa/boşsa ürün tek fiyatlıdır ve `price` gerçek fiyattır.
- *  - `variants` varsa gerçek fiyat SEÇİLEN varyantın fiyatıdır; `price` yalnız
- *    listeleme/taban fiyatı olarak kullanılır.
+ * VERİ MODELİ: 1 ÜRÜN = 1 FİYAT + 1 ÖLÇÜ + 1 RENK.
+ * Farklı ölçü veya renk satılacaksa admin AYRI bir ürün oluşturur.
  *
- * Bu modül fiyat UYDURMAZ: yalnızca veride ne varsa onu okur.
+ *   Fiyat  → YALNIZ product.price
+ *   Ölçü   → YALNIZ product.size
+ *   Renk   → YALNIZ product.color
+ *
+ * `features` bir ölçü kaynağı DEĞİLDİR; genel ürün özelliğidir
+ * (Dolaplı, MDF, Duvara Monte...). `features.find(f => f.includes("cm"))`
+ * benzeri ölçü çıkarma hack'i KULLANILMAZ.
+ *
+ * Legacy `variants` ve `colors` alanları eski dokümanlarda durabilir ama
+ * mağaza iş kuralına GİRMEZ: okunmazlar. Ölçü/renk boşsa UYDURULMAZ —
+ * admin panelinden girilene kadar boş kalır ve ilgili satır gizlenir.
  */
 
-export interface VariantAware {
-  price: number;
-  variants?: ProductVariant[] | null;
+export interface ProductFields {
+  size?: string | null;
+  color?: string | null;
 }
 
-/** Ürünün geçerli (fiyatı > 0 olan) varyantlarını döner. */
-export function getVariants(p: VariantAware): ProductVariant[] {
-  if (!Array.isArray(p.variants)) return [];
-  return p.variants.filter(
-    (v) => v && typeof v.size === "string" && v.size.trim() !== "" && Number(v.price) > 0
-  );
+/** Boş/boşluk-only değerleri null'a indirger. */
+const clean = (v: unknown): string | null => {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed === "" ? null : trimmed;
+};
+
+/** Ürünün tek ölçüsü. Tanımlı değilse null (tahmin edilmez). */
+export function productSize(p: ProductFields): string | null {
+  return clean(p.size);
 }
 
-/** Ürün ölçü seçimi gerektiriyor mu? (birden fazla geçerli varyant) */
-export function requiresVariantChoice(p: VariantAware): boolean {
-  return getVariants(p).length > 1;
+/** Ürünün tek rengi. Tanımlı değilse null (tahmin edilmez). */
+export function productColor(p: ProductFields): string | null {
+  return clean(p.color);
 }
 
-/** Listeleme fiyatı: varyant varsa en düşük varyant fiyatı, yoksa `price`. */
-export function displayPrice(p: VariantAware): number {
-  const vs = getVariants(p);
-  if (vs.length === 0) return Number(p.price) || 0;
-  return Math.min(...vs.map((v) => Number(v.price)));
-}
-
-/** Listelemede "…TL'den başlayan" ifadesi gösterilmeli mi? */
-export function hasPriceRange(p: VariantAware): boolean {
-  const vs = getVariants(p);
-  if (vs.length < 2) return false;
-  const prices = vs.map((v) => Number(v.price));
-  return Math.max(...prices) - Math.min(...prices) > 0.001;
-}
-
-/** Varyantı id ile bulur. */
-export function findVariantById(p: VariantAware, variantId?: string | null): ProductVariant | null {
-  if (!variantId) return null;
-  return getVariants(p).find((v) => v.id === variantId) ?? null;
-}
-
-/** Tek varyant varsa otomatik seçilebilecek varyantı döner. */
-export function soleVariant(p: VariantAware): ProductVariant | null {
-  const vs = getVariants(p);
-  return vs.length === 1 ? vs[0] : null;
-}
-
-/** Sepet satırı kimliği: ürün + varyant/ölçü + renk. */
+/**
+ * Sepet satırı kimliği: ürün + ölçü + renk.
+ *
+ * Artık her ürün tek ölçü/renk taşıdığı için pratikte `id` belirleyicidir;
+ * ölçü ve renk, ürün sepetteyken admin tarafından değiştirilirse eski ve
+ * yeni satırların birbirine karışmaması için kimliğe dahil edilir.
+ */
 export function cartLineKey(parts: {
   id: string;
-  variantId?: string | null;
   size?: string | null;
   color?: string | null;
 }): string {
-  return [parts.id, parts.variantId ?? "", parts.size ?? "", parts.color ?? ""].join("|");
+  return [parts.id, parts.size ?? "", parts.color ?? ""].join("|");
 }

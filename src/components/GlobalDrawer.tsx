@@ -351,7 +351,7 @@ export default function GlobalDrawer() {
           </div>
         ) : (
           items.map((item) => (
-            <div key={`${item.id}-${item.variantId ?? ""}-${item.color}-${item.size}`} className="flex gap-4 border-b border-zinc-100 pb-4">
+            <div key={`${item.id}-${item.size ?? ""}-${item.color ?? ""}`} className="flex gap-4 border-b border-zinc-100 pb-4">
               <div className="w-20 h-20 bg-zinc-100 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center">
                 {item.image ? (
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -377,21 +377,21 @@ export default function GlobalDrawer() {
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center">
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1, item.color, item.size, item.variantId)}
+                      onClick={() => updateQuantity(item.id, item.quantity - 1, item.color, item.size)}
                       className="p-1 hover:bg-zinc-100 text-zinc-600 transition-colors focus:outline-none rounded-md"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
                     <span className="px-3 text-sm font-medium w-8 text-center">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1, item.color, item.size, item.variantId)}
+                      onClick={() => updateQuantity(item.id, item.quantity + 1, item.color, item.size)}
                       className="p-1 hover:bg-zinc-100 text-zinc-600 transition-colors focus:outline-none rounded-md"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
                   <button
-                    onClick={() => removeItem(item.id, item.color, item.size, item.variantId)}
+                    onClick={() => removeItem(item.id, item.color, item.size)}
                     className="text-xs text-zinc-400 hover:text-red-500 font-medium transition-colors underline"
                   >
                     Kaldır

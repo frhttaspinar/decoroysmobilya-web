@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { getVariants, findVariantById } from "@/lib/product-pricing";
-import type { ProductVariant } from "@/data/products";
+import { productSize, productColor } from "@/lib/product-pricing";
 import {
   PAYTR_TOKEN_URL,
   getPaytrCredentials,
@@ -17,20 +16,21 @@ import {
  * Yalnızca `payment_attempts/{id}` (geçici ödeme denemesi) oluşturur.
  * Gerçek sipariş SADECE doğrulanmış PayTR success callback'inde yaratılır.
  *
- * Güvenlik: client'tan gelen fiyat/tutar bilgisine GÜVENİLMEZ. Ürün fiyatları
- * Firestore'dan sunucu tarafında okunur ve toplam burada yeniden hesaplanır.
+ * Güvenlik: client'tan gelen fiyat/ölçü/renk bilgisine GÜVENİLMEZ. Bunların
+ * tamamı Firestore ürün dokümanından sunucu tarafında okunur ve toplam burada
+ * yeniden hesaplanır. Client yalnız ürün kimliği ve adet gönderebilir.
  */
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Client'tan kabul edilen TEK veri: ürün kimliği ve adet.
+ * Gövdede price/size/color/variantId gelse bile OKUNMAZ.
+ */
 interface IncomingItem {
   id: string;
   quantity: number;
-  color?: string | null;
-  size?: string | null;
-  /** Seçilen ölçü varyantının kimliği — fiyat SUNUCUDA bununla bulunur. */
-  variantId?: string | null;
 }
 
 interface CheckoutBody {
@@ -82,9 +82,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    /* ── 2. SUNUCU TARAFI FİYAT DOĞRULAMA ───────────────────────────── */
-    // Ürün fiyatları YALNIZCA Firestore'dan okunur. Client'ın gönderdiği
-    // price / total değerleri hesaplamada kullanılmaz, sadece karşılaştırılır.
+    /* ── 2. SUNUCU TARAFI ÜRÜN DOĞRULAMA ────────────────────────────── */
+    // Fiyat, ölçü ve renk YALNIZCA Firestore'dan okunur. Client'ın gönderdiği
+    // price / size / color değerleri hesaplamada ve snapshot'ta kullanılmaz.
     const uniqueIds = Array.from(new Set(items.map((i) => i.id)));
     const snapshots = await adminDb.getAll(
       ...uniqueIds.map((id) => adminDb.collection("products").doc(id))
@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
     interface ServerProduct {
       price: number;
       name: string;
-      variants: ProductVariant[];
+      size: string | null;
+      color: string | null;
       images: string[];
       stockCode: string | null;
     }
@@ -103,72 +104,42 @@ export async function POST(req: NextRequest) {
       if (!snap.exists) return bad(`Ürün bulunamadı: ${snap.id}`);
       const data = (snap.data() ?? {}) as Record<string, unknown>;
       const price = Number(data.price);
-      const variants = getVariants({
-        price,
-        variants: Array.isArray(data.variants) ? (data.variants as ProductVariant[]) : null,
-      });
 
-      // Varyantı olmayan üründe taban fiyat geçerli olmak ZORUNDA.
-      if (variants.length === 0 && (!Number.isFinite(price) || price <= 0)) {
+      // 1 ÜRÜN = 1 FİYAT: taban fiyat geçerli olmak ZORUNDA.
+      if (!Number.isFinite(price) || price <= 0) {
         return bad(`Ürün fiyatı geçersiz: ${snap.id}`);
       }
 
       productById.set(snap.id, {
         price,
         name: String(data.name ?? "Ürün"),
-        variants,
+        // Ölçü/renk uydurulmaz: ürün dokümanında yoksa null kalır.
+        size: productSize({ size: data.size as string | undefined }),
+        color: productColor({ color: data.color as string | undefined }),
         images: Array.isArray(data.images) ? (data.images as string[]) : [],
         stockCode: data.stockCode ? String(data.stockCode) : null,
       });
     }
 
     /**
-     * Fiyat KAYNAĞI yalnızca sunucudaki ürün dokümanıdır.
-     *  - variants varsa: variantId ile EXACT varyant bulunur, variant.price kullanılır.
-     *  - birden fazla varyant varken variantId yoksa → ödeme başlatılmaz.
-     *  - client'ın gönderdiği size, sunucudaki variant.size ile uyuşmalı.
-     *  - variants yoksa: legacy product.price kullanılır (eski davranış korunur).
+     * Sipariş satırının TEK doğruluk kaynağı sunucudaki ürün dokümanıdır:
+     * fiyat, ölçü, renk, ad, görsel ve stok kodu oradan alınır. Client
+     * manipülasyonuyla başka fiyat/ölçü/renk gönderilmesi imkânsızdır —
+     * gelen değerler hiç okunmaz.
      */
-    const validatedItems = [];
-    for (const it of items) {
+    const validatedItems = items.map((it) => {
       const p = productById.get(it.id)!;
-
-      if (p.variants.length > 0) {
-        if (!it.variantId) {
-          return bad(`"${p.name}" için ölçü seçimi gerekli.`);
-        }
-        const variant = findVariantById({ price: p.price, variants: p.variants }, it.variantId);
-        if (!variant) {
-          return bad(`"${p.name}" için seçilen ölçü bulunamadı.`);
-        }
-        if (it.size && String(it.size).trim() !== variant.size) {
-          return bad(`"${p.name}" için seçilen ölçü doğrulanamadı.`);
-        }
-        validatedItems.push({
-          id: it.id,
-          name: p.name,
-          price: Number(variant.price),      // AUTHORITATIVE
-          quantity: it.quantity,
-          color: it.color ?? null,
-          size: variant.size,                 // sunucudaki ölçü etiketi
-          variantId: variant.id,
-          image: p.images[0] ?? null,
-          stockCode: p.stockCode,
-        });
-      } else {
-        validatedItems.push({
-          id: it.id,
-          name: p.name,
-          price: p.price,                     // legacy tek fiyat
-          quantity: it.quantity,
-          color: it.color ?? null,
-          size: it.size ?? null,
-          variantId: null,
-          image: p.images[0] ?? null,
-          stockCode: p.stockCode,
-        });
-      }
-    }
+      return {
+        id: it.id,
+        name: p.name,
+        price: p.price,        // AUTHORITATIVE
+        quantity: it.quantity,
+        color: p.color,        // AUTHORITATIVE
+        size: p.size,          // AUTHORITATIVE
+        image: p.images[0] ?? null,
+        stockCode: p.stockCode,
+      };
+    });
 
     const serverTotal = Number(
       validatedItems.reduce((acc, i) => acc + i.price * i.quantity, 0).toFixed(2)
@@ -220,8 +191,8 @@ export async function POST(req: NextRequest) {
       "1.2.3.4";
 
     const paymentAmount = tlToKurus(serverTotal); // SADECE sunucu tutarından
-    // PayTR sepet açıklaması: "Ürün adı — 200x30 cm — Bej"
-    // Fiyat yine SUNUCU authoritative varyant fiyatıdır.
+    // PayTR sepet açıklaması: "Ürün adı — 200x30 cm — Kahverengi"
+    // Ad, ölçü, renk ve fiyat: hepsi SUNUCU authoritative ürün dokümanından.
     const basket = validatedItems.map((item) => {
       const label = [item.name, item.size, item.color].filter(Boolean).join(" — ");
       return [label.substring(0, 100), item.price.toFixed(2), String(item.quantity)];

@@ -1,7 +1,7 @@
 "use client";
 
 import { Product } from "@/data/products";
-import { displayPrice, hasPriceRange, requiresVariantChoice, soleVariant } from "@/lib/product-pricing";
+import { productSize, productColor } from "@/lib/product-pricing";
 import { useProductStore } from "@/store/useProductStore";
 import { useCartStore } from "@/store/useCartStore";
 import { useDrawerStore } from "@/store/useDrawerStore";
@@ -9,7 +9,6 @@ import BentoFeatures from "@/components/BentoFeatures";
 import HeroSlider from "@/components/HeroSlider";
 import ScrollVideo from "@/components/ScrollVideo";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 
@@ -49,7 +48,6 @@ export default function Home() {
   const { products } = useProductStore();
   const { addItem } = useCartStore();
   const { openDrawer } = useDrawerStore();
-  const router = useRouter();
 
   const featuredProducts = products.filter((p) => p.featured).slice(0, 4);
 
@@ -86,26 +84,20 @@ export default function Home() {
     reviewsRef.current?.scrollBy({ left: dir === "right" ? 344 : -344, behavior: "smooth" });
   };
 
+  // Her ürün tek fiyat + tek ölçü + tek renk taşır; seçim gerekmez.
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Ölçü seçimi gereken ürün listeden doğrudan sepete eklenemez —
-    // müşteri ölçüyü ürün sayfasında açıkça seçmelidir.
-    if (requiresVariantChoice(product)) {
-      router.push(`/urun/${product.id}`);
-      return;
-    }
-    const only = soleVariant(product);
     addItem({
       id: product.id,
       name: product.name,
-      price: only ? only.price : product.price,
+      price: product.price,
       quantity: 1,
       image: product.images[0],
-      color: product.colors[0],
-      size: only?.size,
-      variantId: only?.id,
+      color: productColor(product) ?? undefined,
+      size: productSize(product) ?? undefined,
+      stockCode: product.stockCode,
     });
     openDrawer("cart");
   };
@@ -213,10 +205,7 @@ export default function Home() {
                     Sınırlı Koleksiyon
                   </span>
                   <p className="text-base font-bold text-zinc-900">
-                    {hasPriceRange(product) && (
-                      <span className="text-xs font-normal text-zinc-400 mr-1">başlayan</span>
-                    )}
-                    {formatPrice(displayPrice(product))} ₺
+                    {formatPrice(product.price)} ₺
                   </p>
                 </div>
 

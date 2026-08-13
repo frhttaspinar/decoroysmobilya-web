@@ -8,7 +8,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
-import { getVariants, soleVariant } from "@/lib/product-pricing";
+import { productSize, productColor } from "@/lib/product-pricing";
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(price);
@@ -51,8 +51,6 @@ export default function UrunClient({ id }: Props) {
   const { products, loading } = useProductStore();
   const { addItem } = useCartStore();
   const { openDrawer } = useDrawerStore();
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex]     = useState(0);
 
   if (loading) {
@@ -90,31 +88,25 @@ export default function UrunClient({ id }: Props) {
     return ["/images/logo.png"];
   })();
 
-  const activeColor = selectedColor ?? product.colors?.[0] ?? "Standart";
-
-  // ── Ölçü varyantları ──
-  // Not: `features` YALNIZCA ürün özelliğidir; ölçü seçiminin kaynağı DEĞİLDİR.
-  const variants = getVariants(product);
-  const onlyVariant = soleVariant(product);
-  // Tek varyant varsa otomatik seçilir; birden fazlaysa müşteri seçmeden devam edemez.
-  const activeVariant =
-    variants.find((v) => v.id === selectedVariantId) ?? onlyVariant ?? null;
-
-  const needsVariantChoice = variants.length > 1 && !activeVariant;
-  // Gerçek fiyat: varyant varsa varyantın fiyatı, yoksa legacy product.price
-  const activePrice = activeVariant ? activeVariant.price : product.price;
+  /**
+   * 1 ÜRÜN = 1 FİYAT + 1 ÖLÇÜ + 1 RENK.
+   * Seçim yoktur: ölçü, renk ve fiyat doğrudan ürün dokümanından okunur.
+   * `features` yalnız genel özelliktir; ölçü kaynağı DEĞİLDİR.
+   */
+  const size = productSize(product);
+  const color = productColor(product);
+  const price = product.price;
 
   const handleAddToCart = () => {
-    if (needsVariantChoice) return;
     addItem({
       id: product.id,
       name: product.name,
-      price: activePrice,
+      price,
       quantity: 1,
       image: product.images[0],
-      color: activeColor,
-      size: activeVariant?.size,
-      variantId: activeVariant?.id,
+      color: color ?? undefined,
+      size: size ?? undefined,
+      stockCode: product.stockCode,
     });
     openDrawer("cart");
   };
@@ -247,52 +239,44 @@ export default function UrunClient({ id }: Props) {
             className="flex items-end gap-2"
           >
             <span className="text-4xl font-black text-zinc-900 tabular-nums">
-              {formatPrice(activePrice)}
+              {formatPrice(price)}
             </span>
             <span className="text-2xl font-bold text-amber-500 pb-0.5">₺</span>
           </motion.div>
 
-          {/* Ölçü Seçeneği — yalnız varyantlı ürünlerde */}
-          {variants.length > 0 && (
+          {/* Ölçü & Renk — SEÇİM DEĞİL, ürünün sabit bilgisi.
+              Girilmemiş alanın satırı hiç gösterilmez (uydurma yapılmaz). */}
+          {(size || color) && (
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.22, ease: EASE }}
-              className="flex flex-col gap-3 border-t border-zinc-100 pt-6"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-zinc-100 pt-6"
             >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-zinc-900">Ölçü Seçeneği</span>
-                {needsVariantChoice && (
-                  <span className="text-xs font-medium text-amber-600">Lütfen bir ölçü seçin</span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2.5">
-                {variants.map((v) => {
-                  const isActive = activeVariant?.id === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setSelectedVariantId(v.id)}
-                      aria-pressed={isActive}
-                      className={`min-w-[7.5rem] rounded-2xl border px-4 py-3 text-left transition-all ${
-                        isActive
-                          ? "border-zinc-900 bg-zinc-900 text-white shadow-md"
-                          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+              {size && (
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                  <span className="block text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+                    Ölçü
+                  </span>
+                  <span className="block text-sm font-semibold text-zinc-900 mt-1">{size}</span>
+                </div>
+              )}
+              {color && (
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                  <span className="block text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+                    Renk
+                  </span>
+                  <span className="flex items-center gap-2 mt-1">
+                    <span
+                      className={`w-4 h-4 rounded-full flex-shrink-0 ${
+                        LIGHT_COLORS.has(color) ? "border border-zinc-300" : ""
                       }`}
-                    >
-                      <span className="block text-sm font-semibold">{v.size}</span>
-                      <span
-                        className={`block text-xs font-medium tabular-nums mt-0.5 ${
-                          isActive ? "text-zinc-200" : "text-zinc-500"
-                        }`}
-                      >
-                        {formatPrice(v.price)} ₺
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      style={{ background: COLOR_HEX[color] ?? "#A8A8A8" }}
+                    />
+                    <span className="text-sm font-semibold text-zinc-900">{color}</span>
+                  </span>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -305,57 +289,6 @@ export default function UrunClient({ id }: Props) {
           >
             {product.description}
           </motion.p>
-
-          {/* Renkler */}
-          {product.colors && product.colors.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.34, ease: EASE }}
-              className="space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-zinc-800 uppercase tracking-widest">Renk Seçeneği</span>
-                <span className="text-sm text-zinc-500 font-medium">{activeColor}</span>
-              </div>
-              <div className="flex flex-wrap gap-2.5">
-                {product.colors.map((color) => {
-                  const hex = COLOR_HEX[color] ?? "#A8A8A8";
-                  const isLight = LIGHT_COLORS.has(color);
-                  const isActive = activeColor === color;
-                  return (
-                    <button
-                      key={color}
-                      onClick={() => setSelectedColor(color)}
-                      title={color}
-                      className={`relative flex items-center gap-2 rounded-full border-2 pl-1.5 pr-4 py-1.5 transition-all duration-200 ${isActive
-                          ? "border-zinc-900 shadow-md"
-                          : "border-zinc-200 hover:border-zinc-400"
-                        }`}
-                    >
-                      <span
-                        className={`w-5 h-5 rounded-full flex-shrink-0 ${isLight ? "border border-zinc-300" : ""}`}
-                        style={{ background: hex }}
-                      />
-                      <span className={`text-sm font-medium ${isActive ? "text-zinc-900" : "text-zinc-500"}`}>
-                        {color}
-                      </span>
-                      {isActive && (
-                        <motion.span
-                          layoutId={`color-check-${id}`}
-                          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-zinc-900 rounded-full flex items-center justify-center shadow"
-                        >
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 10">
-                            <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </motion.span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
 
           {/* Özellikler */}
           {product.features && product.features.length > 0 && (
@@ -391,17 +324,11 @@ export default function UrunClient({ id }: Props) {
             whileHover={{ scale: 1.02, boxShadow: "0 24px 48px rgba(0,0,0,0.2)" }}
             whileTap={{ scale: 0.97 }}
             onClick={handleAddToCart}
-            disabled={needsVariantChoice}
-            title={needsVariantChoice ? "Devam etmek için bir ölçü seçin" : undefined}
-            className="w-full bg-zinc-900 text-white py-5 rounded-2xl text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-zinc-900 text-white py-5 rounded-2xl text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-xl"
           >
-            {needsVariantChoice ? "Ölçü Seçin" : "Sepete Ekle"}
-            {!needsVariantChoice && activeVariant && (
-              <span className="ml-2 text-zinc-400 text-base font-normal">— {activeVariant.size}</span>
-            )}
-            {!needsVariantChoice && product.colors && product.colors.length > 0 && (
-              <span className="ml-2 text-zinc-400 text-base font-normal">— {activeColor}</span>
-            )}
+            Sepete Ekle
+            {size && <span className="ml-2 text-zinc-400 text-base font-normal">— {size}</span>}
+            {color && <span className="ml-2 text-zinc-400 text-base font-normal">— {color}</span>}
           </motion.button>
         </div>
       </div>
