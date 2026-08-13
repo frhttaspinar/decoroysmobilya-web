@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Search, Eye, Tag, Plus, X, Upload, CheckCircle2, Pencil, Trash2, Star, ImagePlus } from "lucide-react";
+import { Search, Eye, Tag, Plus, X, Upload, CheckCircle2, Pencil, Trash2, Star, ImagePlus, Ruler, Palette } from "lucide-react";
 import Image from "next/image";
 import { db, storage } from "@/lib/firebase";
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDocs } from "firebase/firestore";
@@ -31,6 +31,20 @@ export type Product = {
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(price);
+
+const normLabel = (s: string) => s.trim().toLocaleLowerCase("tr");
+
+/**
+ * Ölçü ve renk artık ayrı alanlar (product.size / product.color) olduğu için
+ * listede kendi rozetleriyle gösterilir. Eski kayıtlarda aynı ölçü `features`
+ * içinde de duruyor olabilir — o durumda iki kez göstermemek için ayıklanır.
+ */
+const extraFeatures = (p: Product): string[] => {
+  const taken = new Set(
+    [p.size, p.color].filter((v): v is string => !!v && v.trim() !== "").map(normLabel)
+  );
+  return (p.features ?? []).filter((f) => f && f.trim() !== "" && !taken.has(normLabel(f)));
+};
 
 type FormData = {
   name: string;
@@ -538,6 +552,19 @@ export default function AdminUrunlerPage() {
                     <span className="text-[11px] bg-zinc-50 text-zinc-600 px-2.5 py-1 rounded-full border border-zinc-100 font-medium">
                       {product.category}
                     </span>
+                    {/* Ölçü / renk — dar ekranda da görünsün, satır sarmalıyor */}
+                    {product.size && (
+                      <span title="Ölçü" className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-full font-semibold inline-flex items-center gap-1">
+                        <Ruler className="w-3 h-3 flex-shrink-0" />
+                        {product.size}
+                      </span>
+                    )}
+                    {product.color && (
+                      <span title="Renk" className="text-[11px] bg-violet-50 text-violet-700 border border-violet-100 px-2.5 py-1 rounded-full font-semibold inline-flex items-center gap-1">
+                        <Palette className="w-3 h-3 flex-shrink-0" />
+                        {product.color}
+                      </span>
+                    )}
                     <span className="text-sm font-bold text-zinc-900">₺{formatPrice(product.price)}</span>
                     {product.featured && (
                       <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full flex items-center gap-1">
@@ -663,8 +690,27 @@ export default function AdminUrunlerPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4 hidden xl:table-cell">
+                  {/* Ölçü ve renk kendi rozetleriyle; yoksa hiç gösterilmez (uydurma yok) */}
                   <div className="flex gap-1.5 flex-wrap">
-                    {product.features?.slice(0, 2).map((f) => (
+                    {product.size && (
+                      <span
+                        title="Ölçü"
+                        className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-1 rounded-full font-semibold inline-flex items-center gap-1"
+                      >
+                        <Ruler className="w-3 h-3 flex-shrink-0" />
+                        {product.size}
+                      </span>
+                    )}
+                    {product.color && (
+                      <span
+                        title="Renk"
+                        className="text-[10px] bg-violet-50 text-violet-700 border border-violet-100 px-2 py-1 rounded-full font-semibold inline-flex items-center gap-1"
+                      >
+                        <Palette className="w-3 h-3 flex-shrink-0" />
+                        {product.color}
+                      </span>
+                    )}
+                    {extraFeatures(product).slice(0, 2).map((f) => (
                       <span key={f} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">{f}</span>
                     ))}
                   </div>
@@ -759,24 +805,36 @@ export default function AdminUrunlerPage() {
                 </div>
                 <span className="text-lg font-bold text-zinc-900 flex-shrink-0 whitespace-nowrap">₺{formatPrice(detailProduct.price)}</span>
               </div>
-              {/* Ölçü / Renk — yalnız girilmişse gösterilir */}
+              {/* Ölçü / Renk — ayrı ve açık alanlar. Girilmemişse satırı hiç çizilmez. */}
               {(detailProduct.size || detailProduct.color) && (
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {detailProduct.size && (
-                    <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full border border-blue-100 font-medium">
-                      Ölçü: {detailProduct.size}
-                    </span>
+                    <div className="rounded-xl border border-zinc-100 bg-zinc-50/70 px-4 py-3">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                        <Ruler className="w-3 h-3" />
+                        Ölçü
+                      </span>
+                      <span className="block text-sm font-semibold text-zinc-900 mt-1 break-words">
+                        {detailProduct.size}
+                      </span>
+                    </div>
                   )}
                   {detailProduct.color && (
-                    <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full border border-blue-100 font-medium">
-                      Renk: {detailProduct.color}
-                    </span>
+                    <div className="rounded-xl border border-zinc-100 bg-zinc-50/70 px-4 py-3">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                        <Palette className="w-3 h-3" />
+                        Renk
+                      </span>
+                      <span className="block text-sm font-semibold text-zinc-900 mt-1 break-words">
+                        {detailProduct.color}
+                      </span>
+                    </div>
                   )}
                 </div>
               )}
               <p className="text-sm text-zinc-500 font-light leading-relaxed">{detailProduct.description}</p>
               <div className="flex flex-wrap gap-2 pt-2">
-                {detailProduct.features?.map((f) => (
+                {extraFeatures(detailProduct).map((f) => (
                   <span key={f} className="text-xs bg-zinc-50 text-zinc-600 px-3 py-1.5 rounded-full border border-zinc-100 font-medium flex items-center gap-1.5">
                     <Tag className="w-3 h-3" />{f}
                   </span>
