@@ -8,6 +8,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
+import { getVariants, soleVariant } from "@/lib/product-pricing";
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(price);
@@ -51,6 +52,7 @@ export default function UrunClient({ id }: Props) {
   const { addItem } = useCartStore();
   const { openDrawer } = useDrawerStore();
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex]     = useState(0);
 
   if (loading) {
@@ -90,15 +92,29 @@ export default function UrunClient({ id }: Props) {
 
   const activeColor = selectedColor ?? product.colors?.[0] ?? "Standart";
 
+  // ── Ölçü varyantları ──
+  // Not: `features` YALNIZCA ürün özelliğidir; ölçü seçiminin kaynağı DEĞİLDİR.
+  const variants = getVariants(product);
+  const onlyVariant = soleVariant(product);
+  // Tek varyant varsa otomatik seçilir; birden fazlaysa müşteri seçmeden devam edemez.
+  const activeVariant =
+    variants.find((v) => v.id === selectedVariantId) ?? onlyVariant ?? null;
+
+  const needsVariantChoice = variants.length > 1 && !activeVariant;
+  // Gerçek fiyat: varyant varsa varyantın fiyatı, yoksa legacy product.price
+  const activePrice = activeVariant ? activeVariant.price : product.price;
+
   const handleAddToCart = () => {
+    if (needsVariantChoice) return;
     addItem({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: activePrice,
       quantity: 1,
       image: product.images[0],
       color: activeColor,
-      size: product.features?.find((f) => f.includes("cm")) || undefined,
+      size: activeVariant?.size,
+      variantId: activeVariant?.id,
     });
     openDrawer("cart");
   };
@@ -231,10 +247,54 @@ export default function UrunClient({ id }: Props) {
             className="flex items-end gap-2"
           >
             <span className="text-4xl font-black text-zinc-900 tabular-nums">
-              {formatPrice(product.price)}
+              {formatPrice(activePrice)}
             </span>
             <span className="text-2xl font-bold text-amber-500 pb-0.5">₺</span>
           </motion.div>
+
+          {/* Ölçü Seçeneği — yalnız varyantlı ürünlerde */}
+          {variants.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.22, ease: EASE }}
+              className="flex flex-col gap-3 border-t border-zinc-100 pt-6"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-zinc-900">Ölçü Seçeneği</span>
+                {needsVariantChoice && (
+                  <span className="text-xs font-medium text-amber-600">Lütfen bir ölçü seçin</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                {variants.map((v) => {
+                  const isActive = activeVariant?.id === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVariantId(v.id)}
+                      aria-pressed={isActive}
+                      className={`min-w-[7.5rem] rounded-2xl border px-4 py-3 text-left transition-all ${
+                        isActive
+                          ? "border-zinc-900 bg-zinc-900 text-white shadow-md"
+                          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold">{v.size}</span>
+                      <span
+                        className={`block text-xs font-medium tabular-nums mt-0.5 ${
+                          isActive ? "text-zinc-200" : "text-zinc-500"
+                        }`}
+                      >
+                        {formatPrice(v.price)} ₺
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
 
           {/* Açıklama */}
           <motion.p
@@ -331,10 +391,15 @@ export default function UrunClient({ id }: Props) {
             whileHover={{ scale: 1.02, boxShadow: "0 24px 48px rgba(0,0,0,0.2)" }}
             whileTap={{ scale: 0.97 }}
             onClick={handleAddToCart}
-            className="w-full bg-zinc-900 text-white py-5 rounded-2xl text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-xl"
+            disabled={needsVariantChoice}
+            title={needsVariantChoice ? "Devam etmek için bir ölçü seçin" : undefined}
+            className="w-full bg-zinc-900 text-white py-5 rounded-2xl text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sepete Ekle
-            {product.colors && product.colors.length > 0 && (
+            {needsVariantChoice ? "Ölçü Seçin" : "Sepete Ekle"}
+            {!needsVariantChoice && activeVariant && (
+              <span className="ml-2 text-zinc-400 text-base font-normal">— {activeVariant.size}</span>
+            )}
+            {!needsVariantChoice && product.colors && product.colors.length > 0 && (
               <span className="ml-2 text-zinc-400 text-base font-normal">— {activeColor}</span>
             )}
           </motion.button>

@@ -1,7 +1,27 @@
+/**
+ * Ölçü bazlı fiyat varyantı.
+ * Örn: aynı ürünün 180x30 cm ve 200x30 cm ölçüleri farklı fiyatlı olabilir.
+ */
+export interface ProductVariant {
+  /** Ürün içinde stabil kimlik — sipariş anında snapshot'a yazılır. */
+  id: string;
+  /** Görünen ölçü etiketi, ör. "200x30 cm". */
+  size: string;
+  /** Bu ölçünün gerçek satış fiyatı (TL). */
+  price: number;
+}
+
 export interface Product {
   id: string;
   name: string;
+  /**
+   * Taban/liste fiyatı. GERİYE UYUMLULUK için korunur:
+   * `variants` tanımlı DEĞİLSE gerçek satış fiyatı budur.
+   * `variants` varsa gerçek fiyat seçilen variant.price'tır.
+   */
   price: number;
+  /** Ölçü seçenekleri. Tanımsız veya boşsa ürün tek fiyatlıdır (eski davranış). */
+  variants?: ProductVariant[];
   images: string[];
   category: string;
   description: string;

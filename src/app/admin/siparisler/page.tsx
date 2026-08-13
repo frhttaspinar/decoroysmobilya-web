@@ -373,7 +373,7 @@ export default function AdminSiparislerPage() {
                           </h4>
                           <div className="space-y-3">
                             {order.items?.map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-4 bg-white rounded-xl p-3 border border-zinc-100">
+                              <div key={idx} className="flex items-start gap-4 bg-white rounded-xl p-3 border border-zinc-100">
                                 <div className="w-12 h-12 rounded-lg bg-zinc-100 overflow-hidden flex-shrink-0 relative">
                                   <Image
                                     src={item.image || "/zenna.png"}
@@ -383,9 +383,17 @@ export default function AdminSiparislerPage() {
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-zinc-900 truncate">{item.name}</p>
-                                  <p className="text-xs text-zinc-400">
-                                    {item.quantity} × ₺{formatPrice(item.price)}
+                                  <p className="text-sm font-medium text-zinc-900 break-words">{item.name}</p>
+                                  {/* Ölçü/renk yalnız varsa gösterilir — eski siparişlerle uyumlu */}
+                                  {(item.size || item.color) && (
+                                    <p className="text-xs text-zinc-600 mt-0.5">
+                                      {item.size && <span>Ölçü: <span className="font-medium">{item.size}</span></span>}
+                                      {item.size && item.color && <span className="text-zinc-300"> · </span>}
+                                      {item.color && <span>Renk: <span className="font-medium">{item.color}</span></span>}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-zinc-400 mt-0.5">
+                                    Birim: ₺{formatPrice(item.price)} · Adet: {item.quantity}
                                   </p>
                                 </div>
                                 <span className="text-sm font-bold text-zinc-900 flex-shrink-0">

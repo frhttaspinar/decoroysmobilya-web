@@ -68,11 +68,14 @@ export default function CheckoutPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // Yalnızca KİMLİK verisi taşınır — fiyat gönderilmez ve
+          // gönderilse bile sunucu tarafından yok sayılır.
           items: items.map((item) => ({
-            id:       item.id,
-            quantity: item.quantity,
-            color:    item.color ?? null,
-            size:     item.size  ?? null,
+            id:        item.id,
+            quantity:  item.quantity,
+            color:     item.color ?? null,
+            size:      item.size  ?? null,
+            variantId: item.variantId ?? null,
           })),
           clientTotal: total,
           email:       email.trim(),

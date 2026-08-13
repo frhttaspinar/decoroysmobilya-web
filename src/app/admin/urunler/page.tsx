@@ -6,7 +6,7 @@ import Image from "next/image";
 import { db, storage } from "@/lib/firebase";
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { products as staticProducts } from "@/data/products";
+import { products as staticProducts, type ProductVariant } from "@/data/products";
 
 export type Product = {
   id: string;
@@ -19,6 +19,7 @@ export type Product = {
   colors: string[];
   featured: boolean;
   stockCode?: string;
+  variants?: ProductVariant[];
 };
 
 const formatPrice = (price: number) =>
@@ -66,6 +67,11 @@ export default function AdminUrunlerPage() {
   // Form
   const [formData, setFormData]     = useState<FormData>(emptyForm);
   const [dragActive, setDragActive] = useState(false);
+
+  // ── Ölçü/fiyat varyantları ──
+  // Boş bırakılırsa ürün tek fiyatlı kalır (mevcut davranış korunur).
+  const [variantRows, setVariantRows] = useState<ProductVariant[]>([]);
+  const [variantError, setVariantError] = useState<string | null>(null);
 
   // ── Çoklu görsel state ──────────────────────────────────────
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -134,6 +140,8 @@ export default function AdminUrunlerPage() {
     setIsFormOpen(false);
     setEditingProduct(null);
     setFormData(emptyForm);
+    setVariantRows([]);
+    setVariantError(null);
     setUploadedFiles([]);
     revokeAllPreviews();
     setPreviewUrls([]);
@@ -146,6 +154,8 @@ export default function AdminUrunlerPage() {
       .filter((n) => !isNaN(n) && n > 0);
     const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : products.length + 1;
     setFormData({ ...emptyForm, stockCode: String(nextNum) });
+    setVariantRows([]);
+    setVariantError(null);
     setUploadedFiles([]);
     revokeAllPreviews();
     setPreviewUrls([]);
@@ -163,6 +173,9 @@ export default function AdminUrunlerPage() {
       features:    product.features?.join(", ") || "",
       colors:      product.colors?.join(", ")   || "",
     });
+    // Mevcut varyant ID'leri korunur (stabil kimlik).
+    setVariantRows(Array.isArray(product.variants) ? product.variants.map((v) => ({ ...v })) : []);
+    setVariantError(null);
     setUploadedFiles([]);
     revokeAllPreviews();
     setPreviewUrls([]);
@@ -203,8 +216,60 @@ export default function AdminUrunlerPage() {
   };
   // ────────────────────────────────────────────────────────────
 
+  // ── Varyant satiri yardımcıları ──
+  const addVariantRow = () => {
+    setVariantError(null);
+    setVariantRows((rows) => [
+      ...rows,
+      { id: `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`, size: "", price: 0 },
+    ]);
+  };
+  const updateVariantRow = (index: number, patch: Partial<ProductVariant>) => {
+    setVariantError(null);
+    setVariantRows((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  };
+  const removeVariantRow = (index: number) => {
+    setVariantError(null);
+    setVariantRows((rows) => rows.filter((_, i) => i !== index));
+  };
+
+  /**
+   * Varyantları doğrular. Boş liste geçerlidir (ürün tek fiyatlı kalır).
+   * Kural: her ölçünün adı dolu, fiyatı > 0 ve ölçüler benzersiz olmalı.
+   */
+  const validateVariants = (): { ok: true; variants: ProductVariant[] } | { ok: false; error: string } => {
+    const cleaned = variantRows.map((v) => ({ ...v, size: v.size.trim() }));
+    if (cleaned.length === 0) return { ok: true, variants: [] };
+
+    for (const v of cleaned) {
+      if (!v.size) return { ok: false, error: "Her satır için ölçü girilmelidir." };
+      if (!Number.isFinite(Number(v.price)) || Number(v.price) <= 0) {
+        return { ok: false, error: `"${v.size}" için geçerli bir fiyat girilmelidir.` };
+      }
+    }
+    const seen = new Set<string>();
+    for (const v of cleaned) {
+      const key = v.size.toLocaleLowerCase("tr");
+      if (seen.has(key)) return { ok: false, error: `"${v.size}" ölçüsü birden fazla kez eklenmiş.` };
+      seen.add(key);
+    }
+    return { ok: true, variants: cleaned.map((v) => ({ id: v.id, size: v.size, price: Number(v.price) })) };
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const variantCheck = validateVariants();
+    if (!variantCheck.ok) {
+      setVariantError(variantCheck.error);
+      fireToast(variantCheck.error, "warning");
+      return;
+    }
+    const variants = variantCheck.variants;
+    // Varyant varsa taban fiyat en düşük varyantla senkron tutulur (listeleme için).
+    const basePrice = variants.length > 0
+      ? Math.min(...variants.map((v) => v.price))
+      : Number(formData.price);
 
     const featuresArr = formData.features.split(",").map((f) => f.trim()).filter(Boolean);
     const colorsArr   = formData.colors.split(",").map((c) => c.trim()).filter(Boolean);
@@ -234,7 +299,8 @@ export default function AdminUrunlerPage() {
       try {
         const updateData: Record<string, unknown> = {
           name:        formData.name,
-          price:       Number(formData.price),
+          price:       basePrice,
+          variants,
           description: formData.description,
           category:    formData.category,
           features:    featuresArr.length > 0 ? featuresArr : editingProduct.features,
@@ -253,7 +319,8 @@ export default function AdminUrunlerPage() {
       const newProduct = {
         stockCode:   formData.stockCode,
         name:        formData.name,
-        price:       Number(formData.price),
+        price:       basePrice,
+        variants,
         images:      imageUrls.length > 0 ? imageUrls : [],
         category:    formData.category,
         description: formData.description || "Henüz açıklama eklenmedi.",
@@ -897,13 +964,74 @@ export default function AdminUrunlerPage() {
             </select>
           </div>
 
+          {/* ── Ölçü ve Fiyat Seçenekleri ────────────────────────── */}
+          <div>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <label className="block text-sm font-medium text-zinc-700">
+                Ölçü ve Fiyat Seçenekleri
+              </label>
+              <button
+                type="button"
+                onClick={addVariantRow}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Ölçü Ekle
+              </button>
+            </div>
+            <p className="text-xs text-zinc-400 font-light mb-3">
+              Boş bırakılırsa ürün tek fiyatlı kalır. Birden fazla ölçü eklerseniz
+              müşteri ürün sayfasında ölçü seçmek zorunda kalır ve fiyat seçime göre değişir.
+            </p>
+
+            {variantRows.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {variantRows.map((v, i) => (
+                  <div key={v.id} className="flex gap-2 items-start">
+                    <input
+                      type="text"
+                      value={v.size}
+                      onChange={(e) => updateVariantRow(i, { size: e.target.value })}
+                      placeholder="200x30 cm"
+                      className="flex-1 min-w-0 bg-zinc-50 border border-zinc-100 outline-none focus:ring-2 focus:ring-blue-200 px-4 py-3 rounded-xl text-zinc-900 transition-all placeholder:text-zinc-400"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={v.price === 0 ? "" : String(v.price)}
+                      onChange={(e) => updateVariantRow(i, { price: Number(e.target.value) })}
+                      placeholder="Fiyat ₺"
+                      className="w-32 flex-shrink-0 bg-zinc-50 border border-zinc-100 outline-none focus:ring-2 focus:ring-blue-200 px-4 py-3 rounded-xl text-zinc-900 transition-all placeholder:text-zinc-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeVariantRow(i)}
+                      aria-label="Ölçüyü sil"
+                      className="w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {variantError && (
+              <p className="text-xs text-red-600 font-medium mb-2">{variantError}</p>
+            )}
+          </div>
+
           {/* Fiyat & Stok Kodu — dar ekranda tek kolon */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">Fiyat (₺)</label>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">
+                {variantRows.length > 0 ? "Taban Fiyat (otomatik)" : "Fiyat (₺)"}
+              </label>
               <input
                 type="number"
-                required
+                required={variantRows.length === 0}
+                disabled={variantRows.length > 0}
                 min="0"
                 step="0.01"
                 value={formData.price}

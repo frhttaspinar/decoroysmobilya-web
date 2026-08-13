@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { getVariants, findVariantById } from "@/lib/product-pricing";
+import type { ProductVariant } from "@/data/products";
 import {
   PAYTR_TOKEN_URL,
   getPaytrCredentials,
@@ -27,6 +29,8 @@ interface IncomingItem {
   quantity: number;
   color?: string | null;
   size?: string | null;
+  /** Seçilen ölçü varyantının kimliği — fiyat SUNUCUDA bununla bulunur. */
+  variantId?: string | null;
 }
 
 interface CheckoutBody {
@@ -86,31 +90,85 @@ export async function POST(req: NextRequest) {
       ...uniqueIds.map((id) => adminDb.collection("products").doc(id))
     );
 
-    const priceById = new Map<string, { price: number; name: string }>();
-    for (const snap of snapshots) {
-      if (!snap.exists) return bad(`Ürün bulunamadı: ${snap.id}`);
-      const data = snap.data() as { price?: unknown; name?: unknown } | undefined;
-      const price = Number(data?.price);
-      if (!Number.isFinite(price) || price <= 0) {
-        return bad(`Ürün fiyatı geçersiz: ${snap.id}`);
-      }
-      priceById.set(snap.id, { price, name: String(data?.name ?? "Ürün") });
+    interface ServerProduct {
+      price: number;
+      name: string;
+      variants: ProductVariant[];
+      images: string[];
+      stockCode: string | null;
     }
 
-    // Not: mevcut ürün modelinde renk/ölçü başına fiyat farkı YOKTUR
-    // (products dokümanında tek bir `price` alanı var; `colors` yalnız görsel
-    // seçenek listesidir). Bu yüzden fiyat doğrudan ürün belgesinden alınır.
-    const validatedItems = items.map((it) => {
-      const p = priceById.get(it.id)!;
-      return {
-        id: it.id,
-        name: p.name,
-        price: p.price,
-        quantity: it.quantity,
-        color: it.color ?? null,
-        size: it.size ?? null,
-      };
-    });
+    const productById = new Map<string, ServerProduct>();
+    for (const snap of snapshots) {
+      if (!snap.exists) return bad(`Ürün bulunamadı: ${snap.id}`);
+      const data = (snap.data() ?? {}) as Record<string, unknown>;
+      const price = Number(data.price);
+      const variants = getVariants({
+        price,
+        variants: Array.isArray(data.variants) ? (data.variants as ProductVariant[]) : null,
+      });
+
+      // Varyantı olmayan üründe taban fiyat geçerli olmak ZORUNDA.
+      if (variants.length === 0 && (!Number.isFinite(price) || price <= 0)) {
+        return bad(`Ürün fiyatı geçersiz: ${snap.id}`);
+      }
+
+      productById.set(snap.id, {
+        price,
+        name: String(data.name ?? "Ürün"),
+        variants,
+        images: Array.isArray(data.images) ? (data.images as string[]) : [],
+        stockCode: data.stockCode ? String(data.stockCode) : null,
+      });
+    }
+
+    /**
+     * Fiyat KAYNAĞI yalnızca sunucudaki ürün dokümanıdır.
+     *  - variants varsa: variantId ile EXACT varyant bulunur, variant.price kullanılır.
+     *  - birden fazla varyant varken variantId yoksa → ödeme başlatılmaz.
+     *  - client'ın gönderdiği size, sunucudaki variant.size ile uyuşmalı.
+     *  - variants yoksa: legacy product.price kullanılır (eski davranış korunur).
+     */
+    const validatedItems = [];
+    for (const it of items) {
+      const p = productById.get(it.id)!;
+
+      if (p.variants.length > 0) {
+        if (!it.variantId) {
+          return bad(`"${p.name}" için ölçü seçimi gerekli.`);
+        }
+        const variant = findVariantById({ price: p.price, variants: p.variants }, it.variantId);
+        if (!variant) {
+          return bad(`"${p.name}" için seçilen ölçü bulunamadı.`);
+        }
+        if (it.size && String(it.size).trim() !== variant.size) {
+          return bad(`"${p.name}" için seçilen ölçü doğrulanamadı.`);
+        }
+        validatedItems.push({
+          id: it.id,
+          name: p.name,
+          price: Number(variant.price),      // AUTHORITATIVE
+          quantity: it.quantity,
+          color: it.color ?? null,
+          size: variant.size,                 // sunucudaki ölçü etiketi
+          variantId: variant.id,
+          image: p.images[0] ?? null,
+          stockCode: p.stockCode,
+        });
+      } else {
+        validatedItems.push({
+          id: it.id,
+          name: p.name,
+          price: p.price,                     // legacy tek fiyat
+          quantity: it.quantity,
+          color: it.color ?? null,
+          size: it.size ?? null,
+          variantId: null,
+          image: p.images[0] ?? null,
+          stockCode: p.stockCode,
+        });
+      }
+    }
 
     const serverTotal = Number(
       validatedItems.reduce((acc, i) => acc + i.price * i.quantity, 0).toFixed(2)
@@ -162,11 +220,12 @@ export async function POST(req: NextRequest) {
       "1.2.3.4";
 
     const paymentAmount = tlToKurus(serverTotal); // SADECE sunucu tutarından
-    const basket = validatedItems.map((item) => [
-      item.name.substring(0, 100),
-      item.price.toFixed(2),
-      String(item.quantity),
-    ]);
+    // PayTR sepet açıklaması: "Ürün adı — 200x30 cm — Bej"
+    // Fiyat yine SUNUCU authoritative varyant fiyatıdır.
+    const basket = validatedItems.map((item) => {
+      const label = [item.name, item.size, item.color].filter(Boolean).join(" — ");
+      return [label.substring(0, 100), item.price.toFixed(2), String(item.quantity)];
+    });
     const userBasket = Buffer.from(JSON.stringify(basket)).toString("base64");
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.decoroys.com";

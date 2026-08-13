@@ -63,7 +63,11 @@ function buildHtml(o: PaidOrderNotification): string {
     .map(
       (item) => `
       <tr style="border-bottom:1px solid #f4f4f5;">
-        <td style="padding:10px 0;color:#18181b;font-size:14px;">${esc(item.name)}${item.color ? ` — ${esc(item.color)}` : ""}${item.size ? ` / ${esc(item.size)}` : ""}</td>
+        <td style="padding:10px 0;color:#18181b;font-size:14px;">
+          ${esc(item.name)}
+          ${item.size || item.color ? `<div style="color:#71717a;font-size:12px;margin-top:2px;">${item.size ? `Ölçü: ${esc(item.size)}` : ""}${item.size && item.color ? " · " : ""}${item.color ? `Renk: ${esc(item.color)}` : ""}</div>` : ""}
+          <div style="color:#a1a1aa;font-size:11px;margin-top:2px;">Birim: ₺${formatPrice(item.price)}</div>
+        </td>
         <td style="padding:10px 0;text-align:center;color:#71717a;font-size:14px;">${item.quantity}</td>
         <td style="padding:10px 0;text-align:right;color:#18181b;font-weight:600;font-size:14px;">₺${formatPrice(item.price * item.quantity)}</td>
       </tr>`

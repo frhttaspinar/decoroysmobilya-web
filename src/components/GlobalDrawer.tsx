@@ -351,7 +351,7 @@ export default function GlobalDrawer() {
           </div>
         ) : (
           items.map((item) => (
-            <div key={`${item.id}-${item.color}-${item.size}`} className="flex gap-4 border-b border-zinc-100 pb-4">
+            <div key={`${item.id}-${item.variantId ?? ""}-${item.color}-${item.size}`} className="flex gap-4 border-b border-zinc-100 pb-4">
               <div className="w-20 h-20 bg-zinc-100 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center">
                 {item.image ? (
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -363,30 +363,35 @@ export default function GlobalDrawer() {
                 <div>
                   <h3 className="font-medium text-zinc-900 line-clamp-2 leading-tight">{item.name}</h3>
                   <p className="text-xs text-zinc-500 mt-1">
-                    {item.size && <span>{item.size}</span>}
-                    {item.color && item.size && <span> | </span>}
-                    {item.color && <span>{item.color}</span>}
+                    {item.size && <span>Ölçü: {item.size}</span>}
+                    {item.color && item.size && <span> · </span>}
+                    {item.color && <span>Renk: {item.color}</span>}
                   </p>
-                  <p className="font-light text-zinc-900 mt-1">{item.price.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Birim: {item.price.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺
+                  </p>
+                  <p className="font-medium text-zinc-900 mt-0.5">
+                    {(item.price * item.quantity).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺
+                  </p>
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center">
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.id, item.quantity - 1, item.color, item.size, item.variantId)}
                       className="p-1 hover:bg-zinc-100 text-zinc-600 transition-colors focus:outline-none rounded-md"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
                     <span className="px-3 text-sm font-medium w-8 text-center">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.id, item.quantity + 1, item.color, item.size, item.variantId)}
                       className="p-1 hover:bg-zinc-100 text-zinc-600 transition-colors focus:outline-none rounded-md"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
                   <button
-                    onClick={() => removeItem(item.id, item.color, item.size)}
+                    onClick={() => removeItem(item.id, item.color, item.size, item.variantId)}
                     className="text-xs text-zinc-400 hover:text-red-500 font-medium transition-colors underline"
                   >
                     Kaldır
