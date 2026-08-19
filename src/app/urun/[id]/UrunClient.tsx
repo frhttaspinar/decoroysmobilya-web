@@ -3,7 +3,7 @@
 import { useProductStore } from "@/store/useProductStore";
 import { useCartStore } from "@/store/useCartStore";
 import { useDrawerStore } from "@/store/useDrawerStore";
-import { Truck, ShieldCheck, Sparkles } from "lucide-react";
+import { Truck, ShieldCheck, Sparkles, Play } from "lucide-react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -89,6 +89,19 @@ export default function UrunClient({ id }: Props) {
   })();
 
   /**
+   * Galeri medyası: önce fotoğraflar, EN SONDA (varsa) tek ürün videosu.
+   * videoUrl yoksa dizi yalnız fotoğraflardan oluşur ve galeri
+   * bugünkü davranışını birebir korur.
+   */
+  type Media = { type: "image" | "video"; src: string };
+  const mediaList: Media[] = [
+    ...imageList.map((src): Media => ({ type: "image", src })),
+    ...(product.videoUrl ? [{ type: "video" as const, src: product.videoUrl }] : []),
+  ];
+  // Ürün değişirse index taşabilir; güvenli sınırlama.
+  const activeMedia = mediaList[activeIndex] ?? mediaList[0];
+
+  /**
    * 1 ÜRÜN = 1 FİYAT + 1 ÖLÇÜ + 1 RENK.
    * Seçim yoktur: ölçü, renk ve fiyat doğrudan ürün dokümanından okunur.
    * `features` yalnız genel özelliktir; ölçü kaynağı DEĞİLDİR.
@@ -133,13 +146,25 @@ export default function UrunClient({ id }: Props) {
                 transition={{ duration: 0.22, ease: "easeInOut" }}
                 className="absolute inset-0"
               >
-                <Image
-                  src={imageList[activeIndex]}
-                  alt={`${product.name} — görsel ${activeIndex + 1}`}
-                  fill
-                  className="object-cover"
-                  priority={activeIndex === 0}
-                />
+                {activeMedia.type === "video" ? (
+                  <video
+                    src={activeMedia.src}
+                    controls
+                    muted
+                    playsInline
+                    loop
+                    autoPlay
+                    className="w-full h-full object-cover bg-black"
+                  />
+                ) : (
+                  <Image
+                    src={activeMedia.src}
+                    alt={`${product.name} — görsel ${activeIndex + 1}`}
+                    fill
+                    className="object-cover"
+                    priority={activeIndex === 0}
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
 
@@ -156,39 +181,58 @@ export default function UrunClient({ id }: Props) {
               {product.category}
             </motion.div>
 
-            {/* Görsel sayacı — birden fazla görsel varsa */}
-            {imageList.length > 1 && (
+            {/* Medya sayacı — birden fazla medya varsa. Video seçiliyken
+                oynatıcı kontrollerini kapatmamak için gizlenir. */}
+            {mediaList.length > 1 && activeMedia.type !== "video" && (
               <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-[11px] font-semibold text-white">
-                {activeIndex + 1} / {imageList.length}
+                {activeIndex + 1} / {mediaList.length}
               </div>
             )}
           </div>
 
-          {/* Thumbnail şeridi — yalnızca 1'den fazla görsel varsa */}
-          {imageList.length > 1 && (
+          {/* Thumbnail şeridi — fotoğraflar, en sonda (varsa) video */}
+          {mediaList.length > 1 && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.55, ease: EASE }}
               className="flex gap-3"
             >
-              {imageList.map((src, i) => (
+              {mediaList.map((m, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveIndex(i)}
-                  aria-label={`Görsel ${i + 1}`}
+                  aria-label={m.type === "video" ? "Ürün videosu" : `Görsel ${i + 1}`}
                   className={`relative flex-1 aspect-square rounded-xl overflow-hidden border-2 transition-all duration-300 focus:outline-none ${
                     i === activeIndex
                       ? "border-zinc-900 shadow-md scale-100 opacity-100"
                       : "border-zinc-200 opacity-50 scale-95 hover:opacity-80 hover:border-zinc-400"
                   }`}
                 >
-                  <Image
-                    src={src}
-                    alt={`${product.name} thumbnail ${i + 1}`}
-                    fill
-                    className="object-cover"
-                  />
+                  {m.type === "video" ? (
+                    <>
+                      {/* Listede autoplay YOK: yalnız ilk kare önizlemesi */}
+                      <video
+                        src={m.src}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="absolute inset-0 w-full h-full object-cover bg-zinc-900 pointer-events-none"
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/35">
+                        <span className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow">
+                          <Play className="w-4 h-4 text-zinc-900 fill-zinc-900 translate-x-[1px]" />
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    <Image
+                      src={m.src}
+                      alt={`${product.name} thumbnail ${i + 1}`}
+                      fill
+                      className="object-cover"
+                    />
+                  )}
                   {/* Seçili overlay halkası */}
                   {i === activeIndex && (
                     <motion.div

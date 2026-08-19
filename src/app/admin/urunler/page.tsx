@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Search, Eye, Tag, Plus, X, Upload, CheckCircle2, Pencil, Trash2, Star, ImagePlus, Ruler, Palette } from "lucide-react";
+import { Search, Eye, Tag, Plus, X, Upload, CheckCircle2, Pencil, Trash2, Star, ImagePlus, Ruler, Palette, Video } from "lucide-react";
 import Image from "next/image";
 import { db, storage } from "@/lib/firebase";
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDocs, deleteField } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { products as staticProducts } from "@/data/products";
 
@@ -20,6 +20,8 @@ export type Product = {
   size?: string;
   color?: string;
   images: string[];
+  /** Opsiyonel tek ürün videosu (maks. 15 sn) — yalnız sunum medyası. */
+  videoUrl?: string;
   category: string;
   description: string;
   features: string[];
@@ -68,7 +70,13 @@ const emptyForm: FormData = {
   features: "",
 };
 
-const MAX_IMAGES = 3;
+const MAX_IMAGES = 4;
+
+/** Ürün videosu kuralları — yalnız sunum medyası, ödeme akışına dahil değildir. */
+const MAX_VIDEO_SECONDS = 15;
+/** Storefront'ta güvenilir şekilde oynayan formatlar. */
+const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm"];
+const ACCEPTED_VIDEO_EXT = /\.(mp4|webm)$/i;
 
 export default function AdminUrunlerPage() {
   const [products, setProducts]     = useState<Product[]>([]);
@@ -97,6 +105,17 @@ export default function AdminUrunlerPage() {
   const previewUrlsRef = useRef<string[]>([]);
   // previewUrlsRef her zaman güncel listeyi tutar (URL revoke için)
   useEffect(() => { previewUrlsRef.current = previewUrls; }, [previewUrls]);
+  // ────────────────────────────────────────────────────────────
+
+  // ── Ürün videosu state (opsiyonel, tek dosya) ───────────────
+  const [videoFile, setVideoFile]             = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const videoPreviewRef = useRef<string | null>(null);
+  /** Düzenlemede Firestore'da kayıtlı mevcut video. */
+  const [existingVideoUrl, setExistingVideoUrl] = useState<string | null>(null);
+  /** Admin mevcut videoyu açıkça kaldırdıysa kayıtta videoUrl silinir. */
+  const [videoRemoved, setVideoRemoved]       = useState(false);
+  const [videoDragActive, setVideoDragActive] = useState(false);
   // ────────────────────────────────────────────────────────────
 
   const [isSeeding, setIsSeeding] = useState(false);
@@ -154,6 +173,14 @@ export default function AdminUrunlerPage() {
     previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
   }, []);
 
+  /** Seçili video dosyasını ve object URL'ini temizler (mevcut kayıtlı videoya dokunmaz). */
+  const clearVideoSelection = useCallback(() => {
+    if (videoPreviewRef.current) URL.revokeObjectURL(videoPreviewRef.current);
+    videoPreviewRef.current = null;
+    setVideoPreviewUrl(null);
+    setVideoFile(null);
+  }, []);
+
   const resetAndCloseForm = useCallback(() => {
     setIsFormOpen(false);
     setEditingProduct(null);
@@ -161,7 +188,10 @@ export default function AdminUrunlerPage() {
     setUploadedFiles([]);
     revokeAllPreviews();
     setPreviewUrls([]);
-  }, [revokeAllPreviews]);
+    clearVideoSelection();
+    setExistingVideoUrl(null);
+    setVideoRemoved(false);
+  }, [revokeAllPreviews, clearVideoSelection]);
 
   const openAddForm = () => {
     setEditingProduct(null);
@@ -173,6 +203,9 @@ export default function AdminUrunlerPage() {
     setUploadedFiles([]);
     revokeAllPreviews();
     setPreviewUrls([]);
+    clearVideoSelection();
+    setExistingVideoUrl(null);
+    setVideoRemoved(false);
     setIsFormOpen(true);
   };
 
@@ -194,6 +227,11 @@ export default function AdminUrunlerPage() {
     setUploadedFiles([]);
     revokeAllPreviews();
     setPreviewUrls([]);
+    // Mevcut video korunur; yeni video seçilmedikçe veya açıkça kaldırılmadıkça
+    // kayıt sırasında videoUrl'e DOKUNULMAZ.
+    clearVideoSelection();
+    setExistingVideoUrl(product.videoUrl ?? null);
+    setVideoRemoved(false);
     setDetailProduct(null);
     setIsFormOpen(true);
   };
@@ -228,6 +266,105 @@ export default function AdminUrunlerPage() {
     setUploadedFiles(newFiles);
     setPreviewUrls(newUrls);
     previewUrlsRef.current = newUrls;
+  };
+  // ────────────────────────────────────────────────────────────
+
+  // ── Video seçimi: format + süre doğrulaması ─────────────────
+  /**
+   * Video süresini tarayıcı metadata'sından okur.
+   * Okunamayan/bozuk dosyada reject eder — bu durumda upload YAPILMAZ.
+   */
+  const readVideoDuration = (file: File) =>
+    new Promise<number>((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const probe = document.createElement("video");
+      probe.preload = "metadata";
+
+      let settled = false;
+      const finish = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        URL.revokeObjectURL(url);
+        probe.src = "";
+        fn();
+      };
+      const ok = (d: number) =>
+        finish(() => (Number.isFinite(d) && d > 0 ? resolve(d) : reject(new Error("gecersiz sure"))));
+      const timeout = setTimeout(() => finish(() => reject(new Error("metadata zaman asimi"))), 15000);
+
+      probe.onloadedmetadata = () => {
+        if (Number.isFinite(probe.duration)) { ok(probe.duration); return; }
+        // Bazı WebM dosyaları (ör. MediaRecorder çıktıları) metadata'da süre
+        // taşımaz ve duration = Infinity döner. Sona sarıp gerçek süreyi okuruz.
+        probe.ontimeupdate = () => {
+          probe.ontimeupdate = null;
+          ok(Number.isFinite(probe.duration) ? probe.duration : probe.currentTime);
+        };
+        probe.currentTime = 1e101;
+      };
+      probe.onerror = () => finish(() => reject(new Error("metadata okunamadi")));
+      probe.src = url;
+    });
+
+  /**
+   * Seçilen videoyu doğrular. Doğrulama BAŞARISIZSA state'e yazılmaz ve
+   * dolayısıyla Firebase Storage'a hiçbir şey gönderilmez.
+   */
+  const handleVideoFile = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+
+    const typeOk = ACCEPTED_VIDEO_TYPES.includes(file.type) || ACCEPTED_VIDEO_EXT.test(file.name);
+    if (!typeOk) {
+      fireToast("Lütfen MP4 veya WebM formatında video yükleyin.", "warning");
+      return;
+    }
+
+    let duration: number;
+    try {
+      duration = await readVideoDuration(file);
+    } catch {
+      fireToast("Video dosyası okunamadı. Lütfen MP4 veya WebM formatında video yükleyin.", "warning");
+      return;
+    }
+
+    // 15 sn üst sınır (kayan nokta toleransı). 10 sn altı bloklanmaz — yalnız öneri.
+    if (duration > MAX_VIDEO_SECONDS + 0.05) {
+      fireToast(`Video en fazla ${MAX_VIDEO_SECONDS} saniye olabilir.`, "warning");
+      return;
+    }
+
+    if (videoPreviewRef.current) URL.revokeObjectURL(videoPreviewRef.current);
+    const url = URL.createObjectURL(file);
+    videoPreviewRef.current = url;
+    setVideoPreviewUrl(url);
+    setVideoFile(file);
+    // Yeni video seçmek, "mevcut videoyu kaldır" işaretini geçersiz kılar.
+    setVideoRemoved(false);
+  }, []);
+
+  const handleVideoInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // aynı dosya tekrar seçilebilsin
+    await handleVideoFile(file);
+  };
+
+  const handleVideoDrag = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") setVideoDragActive(true);
+    else if (e.type === "dragleave") setVideoDragActive(false);
+  };
+
+  const handleVideoDrop = async (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    setVideoDragActive(false);
+    await handleVideoFile(e.dataTransfer.files?.[0]);
+  };
+
+  /** Kayıtlı videoyu kaldırma işareti — fotoğrafları ETKİLEMEZ. */
+  const removeExistingVideo = () => {
+    setVideoRemoved(true);
+    clearVideoSelection();
   };
   // ────────────────────────────────────────────────────────────
 
@@ -266,6 +403,28 @@ export default function AdminUrunlerPage() {
     }
     // ────────────────────────────────────────────────────────
 
+    // ── Video yükleme (opsiyonel, tek dosya) ────────────────
+    // Doğrulamayı geçmiş dosya yoksa Storage'a hiçbir istek gitmez.
+    // Path TEK SEVİYE: storage.rules `products/{fileName}` ile uyumlu.
+    let uploadedVideoUrl: string | null = null;
+
+    if (videoFile) {
+      try {
+        const videoRef = ref(
+          storage,
+          `products/video_${Date.now()}_${Math.random().toString(36).slice(2)}_${videoFile.name}`
+        );
+        const snap = await uploadBytes(videoRef, videoFile);
+        uploadedVideoUrl = await getDownloadURL(snap.ref);
+      } catch (uploadError) {
+        console.error("Video yüklenemedi:", uploadError);
+        fireToast("Video yüklenirken hata oluştu.", "warning");
+        return;
+      }
+    }
+    // ────────────────────────────────────────────────────────
+
+
     if (editingProduct) {
       try {
         // Legacy `colors` ve `variants` alanlarına DOKUNULMAZ: silinmez de,
@@ -282,6 +441,11 @@ export default function AdminUrunlerPage() {
         // Yeni görsel seçildiyse güncelle, seçilmediyse mevcut kalsın
         if (imageUrls.length > 0) updateData.images = imageUrls;
 
+        // Video: yeni seçildiyse değiştir; açıkça kaldırıldıysa alanı sil;
+        // hiçbiri değilse mevcut videoUrl'e DOKUNMA. Fotoğraflardan bağımsız.
+        if (uploadedVideoUrl) updateData.videoUrl = uploadedVideoUrl;
+        else if (videoRemoved) updateData.videoUrl = deleteField();
+
         await updateDoc(doc(db, "products", editingProduct.id), updateData);
         fireToast("Ürün başarıyla güncellendi");
       } catch (error) {
@@ -289,7 +453,7 @@ export default function AdminUrunlerPage() {
         fireToast("Ürün güncellenirken hata oluştu.", "warning");
       }
     } else {
-      const newProduct = {
+      const newProduct: Record<string, unknown> = {
         stockCode:   formData.stockCode,
         name:        formData.name,
         price,
@@ -301,6 +465,8 @@ export default function AdminUrunlerPage() {
         features:    featuresArr.length > 0 ? featuresArr : ["Yeni Ürün"],
         featured:    false,
       };
+      // Video opsiyoneldir: yoksa alan hiç yazılmaz.
+      if (uploadedVideoUrl) newProduct.videoUrl = uploadedVideoUrl;
       try {
         await addDoc(collection(db, "products"), newProduct);
         fireToast("Ürün başarıyla eklendi");
@@ -832,6 +998,22 @@ export default function AdminUrunlerPage() {
                   )}
                 </div>
               )}
+              {/* Ürün Videosu — yalnız kayıtlıysa */}
+              {detailProduct.videoUrl && (
+                <div>
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">
+                    <Video className="w-3 h-3" />
+                    Ürün Videosu
+                  </span>
+                  <video
+                    src={detailProduct.videoUrl}
+                    controls
+                    muted
+                    playsInline
+                    className="w-full max-h-56 rounded-xl bg-black"
+                  />
+                </div>
+              )}
               <p className="text-sm text-zinc-500 font-light leading-relaxed">{detailProduct.description}</p>
               <div className="flex flex-wrap gap-2 pt-2">
                 {extraFeatures(detailProduct).map((f) => (
@@ -885,7 +1067,7 @@ export default function AdminUrunlerPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-medium text-zinc-700">
-                Ürün Görselleri
+                Ürün Fotoğrafları — En fazla {MAX_IMAGES}
               </label>
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
                 uploadedFiles.length >= MAX_IMAGES
@@ -959,11 +1141,112 @@ export default function AdminUrunlerPage() {
                 />
                 <ImagePlus className={`w-6 h-6 ${dragActive ? "text-blue-500" : "text-zinc-400"}`} />
                 <span className="text-sm text-zinc-500 font-medium">
-                  {uploadedFiles.length === 0 ? "Görsel Sürükle veya Seç" : "Daha fazla görsel ekle"}
+                  {uploadedFiles.length === 0 ? "Fotoğraf Sürükle veya Seç" : "Daha fazla fotoğraf ekle"}
                 </span>
                 <span className="text-xs text-zinc-400">
-                  PNG, JPG, WEBP — Maks {MAX_IMAGES - uploadedFiles.length} görsel daha
+                  PNG, JPG, WEBP — Maks {MAX_IMAGES - uploadedFiles.length} fotoğraf daha
                 </span>
+              </div>
+            )}
+          </div>
+          {/* ─────────────────────────────────────────────────────── */}
+
+          {/* ── Ürün Videosu — Opsiyonel, tek dosya ──────────────── */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-zinc-700">
+                Ürün Videosu — Opsiyonel
+              </label>
+              {(videoFile || (existingVideoUrl && !videoRemoved)) && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500">
+                  1 / 1
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-zinc-400 font-light mb-3">
+              Önerilen süre 10–15 saniye. Maksimum {MAX_VIDEO_SECONDS} saniye. MP4 veya WebM.
+            </p>
+
+            {/* Yeni seçilen videonun önizlemesi */}
+            {videoPreviewUrl && (
+              <div className="mb-3 rounded-2xl border border-blue-200 bg-zinc-50 p-3">
+                <video
+                  src={videoPreviewUrl}
+                  controls
+                  muted
+                  playsInline
+                  className="w-full max-h-56 rounded-xl bg-black"
+                />
+                <div className="flex items-center justify-between gap-3 mt-2">
+                  <span className="text-[11px] text-zinc-500 truncate min-w-0">
+                    {videoFile?.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearVideoSelection}
+                    className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Videoyu Kaldır
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Kayıtlı mevcut video (yeni seçim yoksa) */}
+            {!videoPreviewUrl && existingVideoUrl && !videoRemoved && (
+              <div className="mb-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold mb-2">
+                  Mevcut Video
+                </p>
+                <video
+                  src={existingVideoUrl}
+                  controls
+                  muted
+                  playsInline
+                  className="w-full max-h-56 rounded-xl bg-black"
+                />
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={removeExistingVideo}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Videoyu Kaldır
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {videoRemoved && !videoPreviewUrl && (
+              <p className="text-xs text-amber-600 font-medium mb-3">
+                Mevcut video kaydedince kaldırılacak. Fotoğraflar etkilenmez.
+              </p>
+            )}
+
+            {/* Seçim alanı — yalnız video yoksa göster */}
+            {!videoPreviewUrl && (!existingVideoUrl || videoRemoved) && (
+              <div
+                onDragEnter={handleVideoDrag}
+                onDragOver={handleVideoDrag}
+                onDragLeave={handleVideoDrag}
+                onDrop={handleVideoDrop}
+                className={`relative w-full h-28 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                  videoDragActive
+                    ? "border-blue-400 bg-blue-50/50"
+                    : "border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-zinc-100/50"
+                }`}
+              >
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm"
+                  onChange={handleVideoInput}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <Video className={`w-6 h-6 ${videoDragActive ? "text-blue-500" : "text-zinc-400"}`} />
+                <span className="text-sm text-zinc-500 font-medium">Video Sürükle veya Seç</span>
+                <span className="text-xs text-zinc-400">MP4, WebM — maks. {MAX_VIDEO_SECONDS} sn</span>
               </div>
             )}
           </div>

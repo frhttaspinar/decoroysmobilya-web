@@ -15,6 +15,11 @@ export interface Product {
   /** Ürünün TEK rengi, ör. "Kahverengi". Girilmemişse gösterilmez. */
   color?: string;
   images: string[];
+  /**
+   * Opsiyonel tek ürün videosu (maks. 15 sn). YALNIZCA sunum/medya alanıdır:
+   * sepete, sipariş snapshot'ına veya PayTR'ye ASLA dahil edilmez.
+   */
+  videoUrl?: string;
   category: string;
   description: string;
   /** Genel ürün özellikleri (Dolaplı, MDF...). Ölçü kaynağı DEĞİLDİR. */
