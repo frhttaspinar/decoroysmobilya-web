@@ -3,7 +3,7 @@
 import { useProductStore } from "@/store/useProductStore";
 import { useCartStore } from "@/store/useCartStore";
 import { useDrawerStore } from "@/store/useDrawerStore";
-import { Truck, ShieldCheck, Sparkles, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Truck, ShieldCheck, Sparkles, Play } from "lucide-react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -55,10 +55,10 @@ export default function UrunClient({ id }: Props) {
 
   if (loading) {
     return (
-      <div className="bg-white min-h-screen py-24">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16">
-          <div className="aspect-[4/5] w-full bg-zinc-100 rounded-3xl animate-pulse" />
-          <div className="flex flex-col gap-6 pt-4">
+      <div className="bg-white min-h-screen py-8 md:py-10 lg:py-12">
+        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+          <div className="aspect-[4/5] w-full bg-zinc-100 rounded-3xl animate-pulse lg:aspect-auto lg:h-[clamp(400px,52vh,520px)]" />
+          <div className="flex flex-col gap-4 lg:gap-5 pt-4">
             <div className="h-10 bg-zinc-200 rounded-xl w-3/4 animate-pulse" />
             <div className="h-8 bg-zinc-100 rounded-xl w-1/3 animate-pulse" />
             <div className="space-y-3 mt-4">
@@ -101,6 +101,18 @@ export default function UrunClient({ id }: Props) {
   // Ürün değişirse index taşabilir; güvenli sınırlama.
   const activeMedia = mediaList[activeIndex] ?? mediaList[0];
 
+  const showPreviousMedia = () => {
+    setActiveIndex((current) =>
+      current === 0 ? mediaList.length - 1 : current - 1
+    );
+  };
+
+  const showNextMedia = () => {
+    setActiveIndex((current) =>
+      current === mediaList.length - 1 ? 0 : current + 1
+    );
+  };
+
   /**
    * 1 ÜRÜN = 1 FİYAT + 1 ÖLÇÜ + 1 RENK.
    * Seçim yoktur: ölçü, renk ve fiyat doğrudan ürün dokümanından okunur.
@@ -125,8 +137,8 @@ export default function UrunClient({ id }: Props) {
   };
 
   return (
-    <div className="bg-white min-h-screen py-16 md:py-24">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
+    <div className="bg-white min-h-screen py-8 md:py-10 lg:py-12">
+      <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
 
         {/* ── Sol: Galeri ── */}
         <motion.div
@@ -136,7 +148,7 @@ export default function UrunClient({ id }: Props) {
           className="flex flex-col gap-4"
         >
           {/* Ana görsel */}
-          <div className="relative aspect-[4/5] w-full bg-zinc-50 rounded-3xl overflow-hidden shadow-2xl">
+          <div className="relative aspect-[4/5] w-full bg-zinc-50 rounded-3xl overflow-hidden shadow-2xl lg:aspect-auto lg:h-[clamp(400px,52vh,520px)]">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={activeIndex}
@@ -154,15 +166,16 @@ export default function UrunClient({ id }: Props) {
                     playsInline
                     loop
                     autoPlay
-                    className="w-full h-full object-cover bg-black"
+                    className="w-full h-full object-contain bg-black"
                   />
                 ) : (
                   <Image
                     src={activeMedia.src}
                     alt={`${product.name} — görsel ${activeIndex + 1}`}
                     fill
-                    className="object-cover"
-                    priority={activeIndex === 0}
+                    className="object-contain"
+                    loading={activeIndex === 0 ? "eager" : "lazy"}
+                    sizes="(max-width: 1023px) calc(100vw - 3rem), 552px"
                   />
                 )}
               </motion.div>
@@ -176,17 +189,37 @@ export default function UrunClient({ id }: Props) {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.45, ease: EASE }}
-              className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-full px-4 py-1.5 text-xs font-bold text-zinc-600 uppercase tracking-widest shadow-sm"
+              className="absolute top-4 left-4 z-10 max-w-[calc(100%-6.5rem)] truncate bg-white/90 backdrop-blur-sm rounded-full px-4 py-1.5 text-xs font-bold text-zinc-600 uppercase tracking-widest shadow-sm"
             >
               {product.category}
             </motion.div>
 
-            {/* Medya sayacı — birden fazla medya varsa. Video seçiliyken
-                oynatıcı kontrollerini kapatmamak için gizlenir. */}
-            {mediaList.length > 1 && activeMedia.type !== "video" && (
-              <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-[11px] font-semibold text-white">
+            {/* Medya sayacı — video kontrollerinden uzakta, üst sağda. */}
+            {mediaList.length > 1 && (
+              <div className="absolute top-4 right-4 z-10 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-[11px] font-semibold text-white">
                 {activeIndex + 1} / {mediaList.length}
               </div>
+            )}
+
+            {mediaList.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousMedia}
+                  aria-label="Önceki medya"
+                  className="absolute left-3 top-1/2 z-20 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow-lg backdrop-blur-sm transition hover:bg-white hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-900/35 lg:left-4 lg:size-11"
+                >
+                  <ChevronLeft className="size-5 lg:size-6" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextMedia}
+                  aria-label="Sonraki medya"
+                  className="absolute right-3 top-1/2 z-20 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-900 shadow-lg backdrop-blur-sm transition hover:bg-white hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-900/35 lg:right-4 lg:size-11"
+                >
+                  <ChevronRight className="size-5 lg:size-6" aria-hidden="true" />
+                </button>
+              </>
             )}
           </div>
 
@@ -196,14 +229,15 @@ export default function UrunClient({ id }: Props) {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.55, ease: EASE }}
-              className="flex gap-3"
+              className="grid grid-flow-col auto-cols-[calc((100%_-_2rem)/5)] gap-2 overflow-x-auto overscroll-x-contain pb-1"
             >
               {mediaList.map((m, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => setActiveIndex(i)}
                   aria-label={m.type === "video" ? "Ürün videosu" : `Görsel ${i + 1}`}
-                  className={`relative flex-1 aspect-square rounded-xl overflow-hidden border-2 transition-all duration-300 focus:outline-none ${
+                  className={`relative min-h-10 w-full aspect-[4/3] rounded-xl overflow-hidden border-2 transition-all duration-300 focus:outline-none focus-visible:ring-4 focus-visible:ring-zinc-900/30 ${
                     i === activeIndex
                       ? "border-zinc-900 shadow-md scale-100 opacity-100"
                       : "border-zinc-200 opacity-50 scale-95 hover:opacity-80 hover:border-zinc-400"
@@ -231,6 +265,7 @@ export default function UrunClient({ id }: Props) {
                       alt={`${product.name} thumbnail ${i + 1}`}
                       fill
                       className="object-cover"
+                      sizes="(max-width: 1023px) 20vw, 104px"
                     />
                   )}
                   {/* Seçili overlay halkası */}
@@ -247,7 +282,7 @@ export default function UrunClient({ id }: Props) {
         </motion.div>
 
         {/* ── Sağ: İçerik ── */}
-        <div className="flex flex-col gap-7 lg:sticky lg:top-28">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-24 lg:gap-5">
 
           {/* Başlık & Rozetler */}
           <motion.div
@@ -256,7 +291,7 @@ export default function UrunClient({ id }: Props) {
             transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
             className="space-y-4"
           >
-            <h1 className="text-4xl md:text-5xl font-black text-zinc-900 tracking-tight leading-tight">
+            <h1 className="text-3xl lg:text-4xl font-black text-zinc-900 tracking-tight leading-tight">
               {product.name}
             </h1>
             <div className="flex flex-wrap gap-2">
@@ -282,7 +317,7 @@ export default function UrunClient({ id }: Props) {
             transition={{ duration: 0.6, delay: 0.18, ease: EASE }}
             className="flex items-end gap-2"
           >
-            <span className="text-4xl font-black text-zinc-900 tabular-nums">
+            <span className="text-3xl lg:text-4xl font-black text-zinc-900 tabular-nums">
               {formatPrice(price)}
             </span>
             <span className="text-2xl font-bold text-amber-500 pb-0.5">₺</span>
@@ -295,10 +330,10 @@ export default function UrunClient({ id }: Props) {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.22, ease: EASE }}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-zinc-100 pt-6"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-zinc-100 pt-4"
             >
               {size && (
-                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-3 py-2">
                   <span className="block text-[11px] font-bold uppercase tracking-widest text-zinc-400">
                     Ölçü
                   </span>
@@ -306,7 +341,7 @@ export default function UrunClient({ id }: Props) {
                 </div>
               )}
               {color && (
-                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 px-3 py-2">
                   <span className="block text-[11px] font-bold uppercase tracking-widest text-zinc-400">
                     Renk
                   </span>
@@ -329,7 +364,7 @@ export default function UrunClient({ id }: Props) {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.26, ease: EASE }}
-            className="text-base text-zinc-600 leading-relaxed border-t border-zinc-100 pt-6"
+            className="text-base text-zinc-600 leading-relaxed border-t border-zinc-100 pt-4"
           >
             {product.description}
           </motion.p>
@@ -350,7 +385,7 @@ export default function UrunClient({ id }: Props) {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.48 + idx * 0.07, ease: EASE }}
-                    className="flex items-center gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-2.5"
+                    className="flex items-center gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2"
                   >
                     <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
                     <span className="text-sm text-zinc-700 font-medium">{feature}</span>
@@ -368,7 +403,7 @@ export default function UrunClient({ id }: Props) {
             whileHover={{ scale: 1.02, boxShadow: "0 24px 48px rgba(0,0,0,0.2)" }}
             whileTap={{ scale: 0.97 }}
             onClick={handleAddToCart}
-            className="w-full bg-zinc-900 text-white py-5 rounded-2xl text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-xl"
+            className="w-full bg-zinc-900 text-white py-4 rounded-2xl text-base lg:text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-zinc-300 shadow-xl"
           >
             Sepete Ekle
             {size && <span className="ml-2 text-zinc-400 text-base font-normal">— {size}</span>}
